@@ -1,6 +1,7 @@
 from sklearn import model_selection
 import pandas as pd
 import torch
+import numpy as np
 
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -11,9 +12,9 @@ def results_to_csv(y_pred, file_name):
         y_pred (numpy.array): predictions
         file_name (string): name of the csv file
     """
-    
+
     df_res = pd.DataFrame({'id': np.arange(len(y_pred)), 'y': y_pred.ravel()})
-    df_res.to_csv(f'data/{file_name}.csv', header=True, index=False)
+    df_res.to_csv(f'data/{file_name}', header=True, index=False)
 
 def gen_dl(data, target=None, batch_size=32):
     """

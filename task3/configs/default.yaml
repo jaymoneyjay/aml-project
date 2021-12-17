@@ -1,0 +1,18 @@
+data:
+  resy: 30
+  resx: 40
+  # exclude_samples: DY7ASN54S9,JANFS05F33
+  include_samples: DY7ASN54S9,JANFS05F33
+
+  # data folder path (no trailing slash)
+  path: data
+
+training:
+  optimizer:
+    name: ADAM
+    lr: 0.00005
+    #name: SGD # initial settings
+    #lr: 0.0001
+
+  batch_size: 10
+  num_workers: 8

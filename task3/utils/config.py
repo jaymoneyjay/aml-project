@@ -20,7 +20,8 @@ def load_config(config):
         cfg = yaml.safe_load(f)
     return cfg
 
-def get_data_loader(cfg, mode='train', get_subset=False, only_annotated=True):
+
+def get_data_loader(cfg, mode='train', get_subset=False):
     assert mode in ['train', 'val', 'test']
 
     incl_samples = None
@@ -34,9 +35,7 @@ def get_data_loader(cfg, mode='train', get_subset=False, only_annotated=True):
         if excl_samples != None:
             excl_samples = excl_samples.split(',')
         batch_size = cfg['training'].get('batch_size', 8)
-    # elif mode == 'val':
-    #    subjects = cfg['data']['val_subjects'].split(',')
-    #    batch_size = cfg['training']['batch_size']
+
     else:
         batch_size = 1
 
@@ -45,8 +44,9 @@ def get_data_loader(cfg, mode='train', get_subset=False, only_annotated=True):
         include_samples=incl_samples,
         exclude_samples=excl_samples,
         mode=mode,
-        img_size=(cfg['data']['resx'], cfg['data']['resy']),
-        only_annotated=only_annotated,
+        img_size=(cfg['data']['resy'], cfg['data']['resx']),
+        asp_ratio=(cfg['data']['asp_y'], cfg['data']['asp_x']),
+        only_annotated=cfg['data']['only_annotated'],
     )
 
 

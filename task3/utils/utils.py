@@ -5,7 +5,7 @@ from .logger import logger_init
 from .config import load_config
 import os
 
-def init(config='configs/default.yaml', checkpoint=None):
+def init(config='configs/default.yaml'):
     # fix random seeds
     torch.manual_seed(42)
     np.random.seed(42)

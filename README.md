@@ -3,6 +3,23 @@
 
 ## Development
 
+### Conda environment
+
+#### Creating Conda env from environment.yml
+
+````shell
+conda env create -f environment.yml
+conda activate aml
+````
+
+#### Updating environment.yml
+
+````shell
+conda env export --no-builds | grep -v "^prefix: " > environment.yml
+````
+
+[Stackoverflow](https://stackoverflow.com/a/41274348/3142478)
+
 ### Logging
 
 ```python

@@ -11,8 +11,8 @@ data:
 
   path: data # data folder path (no trailing slash)
 
-# only batch sized used, so far
-training:
+
+training: # only batch sized used, so far
   optimizer:
     name: ADAM
     lr: 0.00005

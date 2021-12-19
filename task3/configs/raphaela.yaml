@@ -1,0 +1,43 @@
+data:
+  resy: 30 # the output of the data loader gets scaled to these dimensions
+  resx: 40
+
+  asp_y: 3
+  asp_x: 4 # desired aspect ratio; ideally, this matches the aspect ratio of resy/resx
+
+  # if null, loads all 65 samples
+  exclude_samples: null
+  include_samples: null
+  only_annotated: True # If true, dataloader only loads frames with labels (training only)
+  transformations: True # applies composition of transforms (toPIL, )
+  validation_split: 0.2 # size of validation set, size of training set is 1-val_size
+  path: data # data folder path (no trailing slash)
+
+model:
+  smp-unet: # https://segmentation-modelspytorch.readthedocs.io/en/latest/
+    encoder_name: resnet34
+    encoder_weights: null
+    in_channels: 1
+    classes: 2
+    encoder_depth: 5
+    decoder_use_batchnorm: True
+    decoder_channels: [256, 128, 64, 32, 16] 
+    decoder_attention_type: null
+    activation: sigmoid
+    aux_params: null
+
+  simple-unet:
+
+training: # only batch sized used, so far
+  optimizer: Adam
+  lr: 0.00005
+  momentum: 0.9
+  #sgd:
+  #lr: 0.0001
+  loss: bcewithlogits # BCEWithLogitsLoss binary / iou on pytorch: https://stackoverflow.com/questions/48260415/pytorch-how-to-compute-iou-jaccard-index-for-semantic-segmentation
+  num_classes: 2 # should be the same as classes in smp-unet
+  epochs: 1
+  batch_size: 10
+  num_workers: 1  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
+                  # TODO Test speedup
+                  # The num_workers attribute tells the data loader instance how many sub-processes to use for data loading.

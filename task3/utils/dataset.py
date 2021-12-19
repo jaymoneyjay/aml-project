@@ -16,20 +16,20 @@ from loguru import logger
 class Dataset(torch.utils.data.Dataset):
     """ Dataset class"""
 
-    def __init__(self, mode='train', img_size=(30, 40), asp_ratio=(3, 4), dataset_folder='data', exclude_samples=[], include_samples=[], only_annotated=True):
+    def __init__(self, mode='train', img_size=(30, 40), asp_ratio=(3, 4), dataset_folder='data', exclude_samples=[], include_samples=[], only_annotated=True, transformations=None):
         """ Initialization of the the dataset.
 
         Args:
             dataset_folder (str): dataset folder
             exclude_samples (None/list): list of samples to discard (training only)
             include_samples (None/list): list of samples to be used (training only). include_samples overrides exclude_samples
-            mode (str): train, val, or test mode
+            mode (str): train or test mode, train automatically returns a train/val split dataloader
             img_size (tuple): image resolution. Tuple of integers (height, width)
             asp_ratio (tuple): aspect ratio (height, width)
             only_annotated (Bool): If true, only frames with a label are added to the dataset
         """
         # Attributes
-        logger.debug('Exclude samples: {}, include samples: {}', exclude_samples, include_samples)
+        logger.debug('Exclude samples: {}, include samples: {}, applied transforms: {}', exclude_samples, include_samples, transformations)
 
         self.dataset_folder = dataset_folder
         self.exclude_samples = exclude_samples
@@ -39,7 +39,7 @@ class Dataset(torch.utils.data.Dataset):
         self.img_size = img_size # output of image cropping
         self.asp_ratio = asp_ratio
         self.only_annotated = only_annotated
-
+        self.transformations = transformations
         self.samples = []
         self.data = self._prepare_files()
 
@@ -78,6 +78,7 @@ class Dataset(torch.utils.data.Dataset):
         self.samples = samples
 
         # flatten samples to obtain dataset
+        # TODO KeyError: 'frames' when loading test dataset
         for sample in samples:
             for i in range(sample['video'].shape[-1]):
                 frame = sample['video'][:, :, i]
@@ -85,10 +86,10 @@ class Dataset(torch.utils.data.Dataset):
                 if not self.only_annotated or label is not None or self.is_test:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
-                        'frame': frame.astype(np.uint8),
+                        'frame': frame.astype(np.uint8), 
                         'box': sample['box'],
                         'dataset': sample['dataset'],
-                        'label': label,
+                        'label': label, # bool
                     })
 
         return data
@@ -120,7 +121,16 @@ class Dataset(torch.utils.data.Dataset):
         if label is not None:
             cropped_label = get_segment_crop(label, mask=new_mask)
             resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
+            resized_label = resized_label.astype(bool) # np.bool depreciated
+        
+        # check to see if we are applying any transformations
+        if self.transformations is not None:
+            # apply the transformations to both image and its mask
+            resized_frame = self.transformations(resized_frame)
+            resized_label = self.transformations(resized_label)
 
+        assert resized_label.dtype == torch.bool
+        
         item_out = {
             'id': item['id'],
             # 'frame': frame,

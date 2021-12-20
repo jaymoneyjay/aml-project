@@ -152,7 +152,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
         title = list_titles[i] if list_titles is not None else 'Image %d' % (i)
         cmap = list_cmaps[i] if list_cmaps is not None else (None if img_is_color(img) else 'gray')
 
-        list_axes[i].imshow(img, cmap=cmap, interpolation=interpolation)
+        list_axes[i].imshow(img[0, :, :], cmap=cmap, interpolation=interpolation)
         list_axes[i].set_title(title, fontsize=title_fontsize)
         list_axes[i].grid(grid)
 

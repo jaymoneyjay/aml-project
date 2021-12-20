@@ -19,13 +19,12 @@ class Dataset(torch.utils.data.Dataset):
             data_cfg (dict or None): config used for initializing this Dataset class
             mode (str): train or test mode, train automatically returns a train/val split dataloader
         """
-        incl_samples = data_cfg.get('include_samples', None)
-        excl_samples = data_cfg.get('exclude_samples', None)
         transformations = None
-
         if data_cfg.get('transforms', True): # TODO add more transformations, i.e. augmentation
             transformations = transforms.Compose([transforms.ToTensor()])  # transform to Tensor and 0-255 -> 0-1
 
+        incl_samples = data_cfg.get('include_samples', None)
+        excl_samples = data_cfg.get('exclude_samples', None)
         if mode in ['train']:  # TODO: train/val splitting if necessary
             if incl_samples is not None:
                 incl_samples = incl_samples.split(',')
@@ -33,14 +32,15 @@ class Dataset(torch.utils.data.Dataset):
                 excl_samples = excl_samples.split(',')
 
         # read data config
-        self.dataset_folder = data_cfg.get('path', 'data'),
+        self.dataset_folder = data_cfg.get('path', 'data')
         self.exclude_samples = excl_samples
         self.include_samples = incl_samples
         self.mode = mode
+        self.dataset = data_cfg.get('dataset', None)
         self.is_test = (mode == 'test')
-        self.img_size = (data_cfg['resy'], data_cfg['resx']), # output of image cropping
-        self.asp_ratio = (data_cfg['asp_y'], data_cfg['asp_x']),
-        self.only_annotated = data_cfg['only_annotated'],
+        self.img_size = (data_cfg.get('resy', 30), data_cfg.get('resx', 40)) # output of image cropping
+        self.asp_ratio = (data_cfg.get('asp_y', 3), data_cfg.get('asp_x', 4))
+        self.only_annotated = data_cfg.get('only_annotated', True)
         self.transformations = transformations
         self.samples = []
         self.data = self._prepare_files()
@@ -55,6 +55,10 @@ class Dataset(torch.utils.data.Dataset):
         samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_test else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
 
         if not self.is_test:
+            # Only use selected dataset
+            if self.dataset is not None:
+                samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
+
             # remove unwanted samples --> not efficient but allows for warnings
             if self.exclude_samples:
                 for name in self.exclude_samples:
@@ -62,7 +66,7 @@ class Dataset(torch.utils.data.Dataset):
                         sample_idx = next((index for (index, d) in enumerate(samples) if d["name"] == name), None)
                         del samples[sample_idx]
                     except ValueError:
-                        logger.warning('Sample name "{}" invalid.', name)
+                        logger.warning('Sample name "{}" not found in configured dataset.', name)
 
             # only pick wanted samples --> not efficient but allows for warnings
             if self.include_samples:
@@ -72,7 +76,7 @@ class Dataset(torch.utils.data.Dataset):
                         sample_idx = next((index for (index, d) in enumerate(samples) if d["name"] == name), None)
                         samples_temp.append(samples[sample_idx])
                     except:
-                        logger.warning('Sample name "{}" invalid.', name)
+                        logger.warning('Sample name "{}" not found in configured dataset.', name)
                 samples = samples_temp
 
         sample_names = []

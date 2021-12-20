@@ -2,7 +2,7 @@ import yaml
 import numpy as np
 from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
-from .dataset import Dataset
+from task3.utils.dataset import Dataset
 from loguru import logger
 from torch import optim
 
@@ -47,14 +47,12 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     # split train and validation set according to https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
     if mode != 'test':
         validation_split = data_cfg.get('validation_split', 0.2)
-        random_seed = 42
 
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
         split = int(np.floor(validation_split * dataset_size))
         if shuffle:
-            np.random.seed(random_seed)
             np.random.shuffle(indices)
         train_indices, val_indices = indices[split:], indices[:split]
 

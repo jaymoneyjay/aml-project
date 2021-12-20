@@ -1,14 +1,10 @@
-import os
-from glob import glob
-from os.path import join, exists, basename, splitext
 from task3.utils.data_utils import load_zipped_pickle
 from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img
 
-import cv2
+from torchvision import transforms
 import numpy as np
 import torch
 from torch.utils.data.dataloader import default_collate
-from random import choice
 
 from loguru import logger
 
@@ -16,32 +12,41 @@ from loguru import logger
 class Dataset(torch.utils.data.Dataset):
     """ Dataset class"""
 
-    def __init__(self, mode='train', img_size=(30, 40), asp_ratio=(3, 4), dataset_folder='data', exclude_samples=[], include_samples=[], only_annotated=True, transformations=None):
+    def __init__(self, data_cfg=None, mode='train'):
         """ Initialization of the the dataset.
 
         Args:
-            dataset_folder (str): dataset folder
-            exclude_samples (None/list): list of samples to discard (training only)
-            include_samples (None/list): list of samples to be used (training only). include_samples overrides exclude_samples
+            data_cfg (dict or None): config used for initializing this Dataset class
             mode (str): train or test mode, train automatically returns a train/val split dataloader
-            img_size (tuple): image resolution. Tuple of integers (height, width)
-            asp_ratio (tuple): aspect ratio (height, width)
-            only_annotated (Bool): If true, only frames with a label are added to the dataset
         """
-        # Attributes
-        logger.debug('Exclude samples: {}, include samples: {}, applied transforms: {}', exclude_samples, include_samples, transformations)
+        incl_samples = data_cfg.get('include_samples', None)
+        excl_samples = data_cfg.get('exclude_samples', None)
+        transformations = None
 
-        self.dataset_folder = dataset_folder
-        self.exclude_samples = exclude_samples
-        self.include_samples = include_samples
+        if data_cfg.get('transforms', True): # TODO add more transformations, i.e. augmentation
+            transformations = transforms.Compose([transforms.ToTensor()])  # transform to Tensor and 0-255 -> 0-1
+
+        if mode in ['train']:  # TODO: train/val splitting if necessary
+            if incl_samples is not None:
+                incl_samples = incl_samples.split(',')
+            if excl_samples is not None:
+                excl_samples = excl_samples.split(',')
+
+        # read data config
+        self.dataset_folder = data_cfg.get('path', 'data'),
+        self.exclude_samples = excl_samples
+        self.include_samples = incl_samples
         self.mode = mode
         self.is_test = (mode == 'test')
-        self.img_size = img_size # output of image cropping
-        self.asp_ratio = asp_ratio
-        self.only_annotated = only_annotated
+        self.img_size = (data_cfg['resy'], data_cfg['resx']), # output of image cropping
+        self.asp_ratio = (data_cfg['asp_y'], data_cfg['asp_x']),
+        self.only_annotated = data_cfg['only_annotated'],
         self.transformations = transformations
         self.samples = []
         self.data = self._prepare_files()
+
+        logger.debug('Exclude samples: {}, include samples: {}, applied transforms: {}', self.exclude_samples,
+                     self.include_samples, self.transformations)
 
     def _prepare_files(self):
         data = []
@@ -133,11 +138,8 @@ class Dataset(torch.utils.data.Dataset):
         
         item_out = {
             'id': item['id'],
-            # 'frame': frame,
             'frame_cropped': resized_frame,
             'dataset': item['dataset'],
-            # 'label': item['label'],
-            # 'label_cropped': resized_label,
         }
 
         if resized_label is not None:

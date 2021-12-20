@@ -123,8 +123,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
 
     assert isinstance(list_images, list)
     assert len(list_images) > 0
-    if not isinstance(list_images[0], np.ndarray):
-        list_images = np.array(list_images)
+    assert isinstance(list_images[0], np.ndarray)
 
     if list_titles is not None:
         assert isinstance(list_titles, list)
@@ -152,7 +151,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
         title = list_titles[i] if list_titles is not None else 'Image %d' % (i)
         cmap = list_cmaps[i] if list_cmaps is not None else (None if img_is_color(img) else 'gray')
 
-        list_axes[i].imshow(img[0, :, :], cmap=cmap, interpolation=interpolation)
+        list_axes[i].imshow(img, cmap=cmap, interpolation=interpolation)
         list_axes[i].set_title(title, fontsize=title_fontsize)
         list_axes[i].grid(grid)
 
@@ -162,16 +161,24 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
     fig.tight_layout()
     _ = plt.show()
 
-def show_img_batch(batch, title=None):
+def show_img_batch(batch, list_titles=None):
     batch_frames = batch['frame_cropped']
     batch_labels = batch.get('label_cropped', None)
     logger.debug(batch_frames.shape)
     to_plot = []
 
-    for i in range(batch_frames.shape[0]):
-        to_plot.append(batch_frames[i, :, :])
+    if len(batch_frames.shape) > 3:
+        # batch of more than 1 element
+        for i in range(batch_frames.shape[0]):
+            to_plot.append(batch_frames[i, 0, :, :].numpy())
+            if batch_labels is not None:
+                to_plot.append(batch_labels[i, 0, :, :].numpy())
+    else:
+        to_plot = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
-            to_plot.append(batch_labels[i, :, :])
+            to_plot.append(batch_labels[0, :, :].numpy())
 
-    show_image_list(to_plot, num_cols=4)
+    logger.debug(to_plot[0].shape)
+
+    show_image_list(to_plot, num_cols=4, list_titles=list_titles)
 

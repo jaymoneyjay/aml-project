@@ -91,13 +91,13 @@ class Dataset(torch.utils.data.Dataset):
         for sample in samples:
             for i in range(sample['video'].shape[-1]):
                 frame = sample['video'][:, :, i]
-                label = sample['label'][:, :, i] if i in sample['frames'] else None
+                label = sample['label'][:, :, i] if not self.is_test and i in sample['frames'] else None
                 if not self.only_annotated or label is not None or self.is_test:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
                         'frame': frame.astype(np.uint8), 
-                        'box': sample['box'],
-                        'dataset': sample['dataset'],
+                        'box': sample['box'] if not self.is_test else None,
+                        'dataset': sample['dataset'] if not self.is_test else None,
                         'label': label, # bool
                     })
 
@@ -118,35 +118,47 @@ class Dataset(torch.utils.data.Dataset):
         item = self.data[idx]
         frame = item['frame']
         label = item['label']
-        mask = item['box']
+        mask = item['box'] # TODO: ROI predicition
 
-        # crop frame to bounding box, then rescale to target resolution
-        new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
-        cropped_frame = get_segment_crop(frame, mask=new_mask)
-        resized_frame = resize_img(cropped_frame, width=self.img_size[1], height=self.img_size[0])
-
-        # crop label to bounding box, then rescale to target resolution
         resized_label = None
-        if label is not None:
-            cropped_label = get_segment_crop(label, mask=new_mask)
-            resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
-            resized_label = resized_label.astype(bool) # np.bool depreciated
-        
-        # check to see if we are applying any transformations
-        if self.transformations is not None:
-            # apply the transformations to both image and its mask
-            resized_frame = self.transformations(resized_frame)
-            resized_label = self.transformations(resized_label)
+        resized_frame = None
 
-        assert resized_label.dtype == torch.bool
-        
-        item_out = {
-            'id': item['id'],
-            'frame_cropped': resized_frame,
-            'dataset': item['dataset'],
-        }
+        if not self.is_test:
+            # crop frame to bounding box, then rescale to target resolution
+            new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
+            cropped_frame = get_segment_crop(frame, mask=new_mask)
+            resized_frame = resize_img(cropped_frame, width=self.img_size[1], height=self.img_size[0])
 
-        if resized_label is not None:
-            item_out['label_cropped'] = resized_label
+            # crop label to bounding box, then rescale to target resolution
+            if label is not None:
+                cropped_label = get_segment_crop(label, mask=new_mask)
+                resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
+                resized_label = resized_label.astype(bool) # np.bool depreciated
 
-        return item_out
+            # check to see if we are applying any transformations
+            if self.transformations is not None:
+                # apply the transformations to both image and its mask
+                resized_frame = self.transformations(resized_frame)
+                resized_label = self.transformations(resized_label)
+
+            assert resized_label.dtype == torch.bool
+        else:
+            resized_frame = resize_img(frame, width=self.img_size[1], height=self.img_size[0])
+
+        if self.is_test:
+            return {
+                'id': item['id'],
+                'frame_cropped': resized_frame,
+            }
+        else:
+
+            item_out = {
+                'id': item['id'],
+                'frame_cropped': resized_frame,
+                'dataset': item['dataset'],
+            }
+
+            if resized_label is not None:
+                item_out['label_cropped'] = resized_label
+
+            return item_out

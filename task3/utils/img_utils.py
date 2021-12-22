@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from loguru import logger
+from torch import squeeze
 
 def np_to_opencv(img):
     """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""

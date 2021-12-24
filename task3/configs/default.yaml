@@ -1,3 +1,6 @@
+application:
+  log_level: 'DEBUG' # one of ['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL']
+
 data:
   resy: 30 # the output of the data loader gets scaled to these dimensions
   resx: 40

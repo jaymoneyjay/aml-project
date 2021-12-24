@@ -19,6 +19,9 @@ class Dataset(torch.utils.data.Dataset):
             data_cfg (dict or None): config used for initializing this Dataset class
             mode (str): train or test mode, train automatically returns a train/val split dataloader
         """
+        if data_cfg is None:
+            data_cfg = {}
+
         transformations = None
         if data_cfg.get('transforms', True): # TODO add more transformations, i.e. augmentation
             transformations = transforms.Compose([transforms.ToTensor()])  # transform to Tensor and 0-255 -> 0-1

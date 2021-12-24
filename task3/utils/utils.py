@@ -11,10 +11,12 @@ def init(config='configs/default.yaml'):
     np.random.seed(42)
     seed(42)
 
-    # set logger format
-    logger_init()
+    cfg = load_config(config)
 
-    return load_config(config)
+    # set logger format
+    logger_init(cfg['application'].get('log_level', 'DEBUG'))
+
+    return cfg
 
 def cond_mkdir(dir_path):
     if not os.path.exists(dir_path):

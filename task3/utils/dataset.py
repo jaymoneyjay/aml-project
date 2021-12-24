@@ -109,8 +109,7 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        """ Returns an item of the dataset.
-
+        """ Returns an item of the dataset. But should actually return frames, label to be easily integrated with other libraries.
         Args:
             idx (int): data ID.
         """

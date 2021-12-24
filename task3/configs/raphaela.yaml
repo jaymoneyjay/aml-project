@@ -1,8 +1,8 @@
 data:
-  resy: 30 # the output of the data loader gets scaled to these dimensions
-  resx: 40
+  resy: 256 # the output of the data loader gets scaled to these dimensions
+  resx: 256
 
-  asp_y: 3
+  asp_y: 3  # 1,1 raises an error RuntimeError: When creating a new ROI box mask, the coordinates leave the valid coordinate range. --> see TODO in img_utils.py
   asp_x: 4 # desired aspect ratio; ideally, this matches the aspect ratio of resy/resx
 
   # if null, loads all 65 samples
@@ -19,7 +19,7 @@ model:
     encoder_name: resnet34
     encoder_weights: null
     in_channels: 1
-    classes: 2
+    classes: 1 # we only need one output channel showing True/False
     encoder_depth: 5
     decoder_use_batchnorm: True
     decoder_channels: [256, 128, 64, 32, 16] 
@@ -37,8 +37,8 @@ training: # only batch sized used, so far
   #lr: 0.0001
   loss: bcewithlogits # BCEWithLogitsLoss binary / iou on pytorch: https://stackoverflow.com/questions/48260415/pytorch-how-to-compute-iou-jaccard-index-for-semantic-segmentation
   num_classes: 2 # should be the same as classes in smp-unet
-  epochs: 1
-  batch_size: 10
-  num_workers: 1  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
+  epochs: 40
+  batch_size: 3
+  num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
                   # TODO Test speedup
                   # The num_workers attribute tells the data loader instance how many sub-processes to use for data loading.

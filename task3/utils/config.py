@@ -22,7 +22,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     """ mode train automatically returns two data loaders, one for training and one for validation.
     split is define in yaml.
     """
-    assert mode in ['train', 'test']
+    assert mode in ['train', 'submission']
     data_cfg = cfg['data']
         
     dataset = Dataset(
@@ -45,35 +45,45 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         subset = Subset(dataset, subset_idx)
 
     # split train and validation set according to https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
-    if mode != 'test':
+    if mode != 'submission':
+        test_split = data_cfg.get('test_split', 0.2)
         validation_split = data_cfg.get('validation_split', 0.2)
 
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
-        split = int(np.floor(validation_split * dataset_size))
+        test_size = int(np.floor(test_split * dataset_size))
+        train_size = int(np.floor((1 - validation_split) * (dataset_size - test_size)))
         if shuffle:
             np.random.shuffle(indices)
-        train_indices, val_indices = indices[split:], indices[:split]
+        train_indices, test_indices, val_indices = indices[:train_size], indices[train_size:(train_size + test_size)], indices[(train_size + test_size):]
 
         # Creating PT data samplers and loaders:
+        logger.debug('Dataset creation: train')
         train_sampler = SubsetRandomSampler(train_indices)
         train_loader = DataLoader(subset if get_subset else dataset, 
                                   batch_size=batch_size,
                                   num_workers=num_workers,
-                                  #shuffle=shuffle, # shuffle is mutually exclusive with sampler option
                                   sampler=train_sampler,
                                   )
-        
+
+        logger.debug('Dataset creation: validation')
         valid_sampler = SubsetRandomSampler(val_indices)
         validation_loader = DataLoader(subset if get_subset else dataset, 
                                        batch_size=batch_size,
                                        num_workers=num_workers,
-                                       #shuffle=shuffle, # shuffle is mutually exclusive with sampler option
                                        sampler=valid_sampler
                                       )
+
+        logger.debug('Dataset creation: test')
+        test_sampler = SubsetRandomSampler(test_indices)
+        test_loader = DataLoader(subset if get_subset else dataset,
+                                       batch_size=batch_size,
+                                       num_workers=num_workers,
+                                       sampler=test_sampler
+                                       )
         
-        return train_loader, validation_loader
+        return train_loader, validation_loader, test_loader
     
     else: # no sampling needed for test set
         data_loader = DataLoader(

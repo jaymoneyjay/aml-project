@@ -37,7 +37,7 @@ class Dataset(torch.utils.data.Dataset):
         self.include_samples = incl_samples
         self.mode = mode
         self.dataset = data_cfg.get('dataset', None)
-        self.is_test = (mode == 'test')
+        self.is_submission = (mode == 'submission')
         self.img_size = (data_cfg.get('resy', 30), data_cfg.get('resx', 40)) # output of image cropping
         self.asp_ratio = (data_cfg.get('asp_y', 3), data_cfg.get('asp_x', 4))
         self.only_annotated = data_cfg.get('only_annotated', True)
@@ -52,9 +52,9 @@ class Dataset(torch.utils.data.Dataset):
         data = []
 
         # unzip and load dataset
-        samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_test else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
+        samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
 
-        if not self.is_test:
+        if not self.is_submission:
             # Only use selected dataset
             if self.dataset is not None:
                 samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
@@ -91,13 +91,13 @@ class Dataset(torch.utils.data.Dataset):
         for sample in samples:
             for i in range(sample['video'].shape[-1]):
                 frame = sample['video'][:, :, i]
-                label = sample['label'][:, :, i] if not self.is_test and i in sample['frames'] else None
-                if not self.only_annotated or label is not None or self.is_test:
+                label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
+                if not self.only_annotated or label is not None or self.is_submission:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
                         'frame': frame.astype(np.uint8), 
-                        'box': sample['box'] if not self.is_test else None,
-                        'dataset': sample['dataset'] if not self.is_test else None,
+                        'box': sample['box'] if not self.is_submission else None,
+                        'dataset': sample['dataset'] if not self.is_submission else None,
                         'label': label, # bool
                     })
 
@@ -123,7 +123,7 @@ class Dataset(torch.utils.data.Dataset):
         resized_label = None
         resized_frame = None
 
-        if not self.is_test:
+        if not self.is_submission:
             # crop frame to bounding box, then rescale to target resolution
             new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
             cropped_frame = get_segment_crop(frame, mask=new_mask)
@@ -145,7 +145,7 @@ class Dataset(torch.utils.data.Dataset):
         else:
             resized_frame = resize_img(frame, width=self.img_size[1], height=self.img_size[0])
 
-        if self.is_test:
+        if self.is_submission:
             return {
                 'id': item['id'],
                 'frame_cropped': resized_frame,

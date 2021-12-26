@@ -11,10 +11,11 @@ data:
   # if null, loads all 65 samples
   exclude_samples: null
   include_samples: null
-  dataset: expert # possible values: amateur, expert, null (null includes both datasets; training only)
+  dataset: null # possible values: amateur, expert, null (null includes both datasets; training only)
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
+  batch_size: 3
   path: data # data folder path (no trailing slash)
 
 model:
@@ -38,10 +39,10 @@ training: # only batch sized used, so far
   momentum: 0.9
   #sgd:
   #lr: 0.0001
-  loss: bcewithlogits # BCEWithLogitsLoss binary / iou on pytorch: https://stackoverflow.com/questions/48260415/pytorch-how-to-compute-iou-jaccard-index-for-semantic-segmentation
-  num_classes: 2 # should be the same as classes in smp-unet
-  epochs: 40
-  batch_size: 3
+  loss: bcewithlogits # no effect// BCEWithLogitsLoss binary / iou on pytorch: https://stackoverflow.com/questions/48260415/pytorch-how-to-compute-iou-jaccard-index-for-semantic-segmentation
+  epochs: 30
   num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
+  num_batch_val: 2 # evaluate model every n-th batch
+  save_path: outputs/run_1/ # where to save models to
                   # TODO Test speedup
                   # The num_workers attribute tells the data loader instance how many sub-processes to use for data loading.

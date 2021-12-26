@@ -183,3 +183,23 @@ def show_img_batch(batch, list_titles=None):
 
     show_image_list(to_plot, num_cols=4, list_titles=list_titles)
 
+def show_img_batch_and_pred(batch, pred, list_titles=None):
+    batch_frames = batch['frame_cropped']
+    batch_labels = pred
+    logger.debug(batch_frames.shape)
+    to_plot = []
+
+    if len(batch_frames.shape) > 3:
+        # batch of more than 1 element
+        for i in range(batch_frames.shape[0]):
+            to_plot.append(batch_frames[i, 0, :, :].numpy())
+            if batch_labels is not None:
+                to_plot.append(batch_labels[i, 0, :, :].numpy())
+    else:
+        to_plot = [batch_frames[0, :, :].numpy()]
+        if batch_labels is not None:
+            to_plot.append(batch_labels[0, :, :].numpy())
+
+    logger.debug(to_plot[0].shape)
+
+    show_image_list(to_plot, num_cols=4, list_titles=list_titles)

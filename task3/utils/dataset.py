@@ -98,6 +98,7 @@ class Dataset(torch.utils.data.Dataset):
                 if not self.only_annotated or label is not None or self.is_submission:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
+                        'name': sample['name'], # keep name as it is needed in evaluation function
                         'frame': frame.astype(np.uint8), 
                         'box': sample['box'] if not self.is_submission else None,
                         'dataset': sample['dataset'] if not self.is_submission else None,
@@ -118,6 +119,7 @@ class Dataset(torch.utils.data.Dataset):
         """
 
         item = self.data[idx]
+        name = item['name']
         frame = item['frame']
         label = item['label']
         mask = item['box'] # TODO: ROI predicition
@@ -145,17 +147,20 @@ class Dataset(torch.utils.data.Dataset):
 
             assert resized_label.dtype == torch.bool
         else:
+            # careful if we resize test set for prediction, we need to scale it back afterwards
             resized_frame = resize_img(frame, width=self.img_size[1], height=self.img_size[0])
 
         if self.is_submission:
             return {
                 'id': item['id'],
+                'name' : name,
                 'frame_cropped': resized_frame,
             }
         else:
 
             item_out = {
                 'id': item['id'],
+                'name' : name,
                 'frame_cropped': resized_frame,
                 'dataset': item['dataset'],
             }

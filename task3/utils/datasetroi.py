@@ -55,7 +55,7 @@ class Dataset(torch.utils.data.Dataset):
         data = []
 
         # unzip and load dataset
-        samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
+        samples = load_zipped_pickle("{}/expert_train_padded.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/expert_test_padded.pkl".format(self.dataset_folder))
         print(samples[0].keys())
         if not self.is_submission:
             # Only use selected dataset
@@ -100,7 +100,7 @@ class Dataset(torch.utils.data.Dataset):
                         'id': '{}_{}'.format(sample['name'], i),
                         'name': sample['name'], # keep name as it is needed in evaluation function
                         'frame': frame.astype(np.uint8), 
-                        'box': sample['box'] if not self.is_submission else None, # replace with 'roi'
+                        'box': sample['roi'] if not self.is_submission else None, # replace with 'roi'
                         'dataset': sample['dataset'] if not self.is_submission else None,
                         'label': label, # bool
                     })

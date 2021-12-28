@@ -4,10 +4,12 @@ import cv2
 from loguru import logger
 from torch import squeeze
 
+
 def np_to_opencv(img):
     """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
     uint_img = np.array(img, dtype=np.uint8)
     return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
+
 
 def mask_to_ratio(mask, height=3, width=4):
     """Takes 2D Boolean Numpy mask (Array) and returns corresponding mask with given aspect ratio"""
@@ -37,12 +39,14 @@ def mask_to_ratio(mask, height=3, width=4):
     new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
     return new_mask
 
+
 def resize_img(img, width=40, height=30):
     """Resizes 2D Numpy array to given dimensions"""
     # could also try different interpolations such as INTER_CUBIC: https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/
     img = img.astype(np.uint8)
     resized = cv2.resize(img, dsize=(width, height), interpolation=cv2.INTER_AREA)
     return resized
+
 
 def get_segment_crop(img,tol=0, mask=None):
     """Get image crop based on a Boolean mask, following https://stackoverflow.com/a/53108489"""
@@ -79,6 +83,7 @@ def get_box_props(mask):
     box_props['mask_dims'] = mask.shape
 
     return box_props
+
 
 def show_img(img):
     plt.imshow(img, interpolation=None)
@@ -162,43 +167,29 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
     fig.tight_layout()
     _ = plt.show()
 
-def show_img_batch(batch, list_titles=None):
-    batch_frames = batch['frame_cropped']
-    batch_labels = batch.get('label_cropped', None)
+
+def show_img_batch(batch, list_titles=None, pred=None):
+    if type(batch) is not dict:
+        logger.warning('Could not visualize batch: No batch dict provided.')
+        return
+    batch_frames = batch.get('frame_cropped', np.empty(0)) # ugly, ik... ;)
+    batch_labels = batch.get('label_cropped', np.empty(0)) if pred is not None else pred
     logger.debug(batch_frames.shape)
     to_plot = []
 
-    if len(batch_frames.shape) > 3:
+    if len(batch_frames.shape) == 4:
         # batch of more than 1 element
         for i in range(batch_frames.shape[0]):
             to_plot.append(batch_frames[i, 0, :, :].numpy())
             if batch_labels is not None:
                 to_plot.append(batch_labels[i, 0, :, :].numpy())
-    else:
+    elif batch_frames.shape == 3: # batch size 1
         to_plot = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
             to_plot.append(batch_labels[0, :, :].numpy())
-
-    logger.debug(to_plot[0].shape)
-
-    show_image_list(to_plot, num_cols=4, list_titles=list_titles)
-
-def show_img_batch_and_pred(batch, pred, list_titles=None):
-    batch_frames = batch['frame_cropped']
-    batch_labels = pred
-    logger.debug(batch_frames.shape)
-    to_plot = []
-
-    if len(batch_frames.shape) > 3:
-        # batch of more than 1 element
-        for i in range(batch_frames.shape[0]):
-            to_plot.append(batch_frames[i, 0, :, :].numpy())
-            if batch_labels is not None:
-                to_plot.append(batch_labels[i, 0, :, :].numpy())
     else:
-        to_plot = [batch_frames[0, :, :].numpy()]
-        if batch_labels is not None:
-            to_plot.append(batch_labels[0, :, :].numpy())
+        logger.warning('Could not visualize batch: Invalid batch dimensions.')
+        return
 
     logger.debug(to_plot[0].shape)
 

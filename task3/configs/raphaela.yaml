@@ -4,6 +4,10 @@ application:
 device: cpu # cpu or cuda (for gpu); train on cpu or gpu
 
 data:
+  path: data/data_roi # data folder path (no trailing slash)
+  dataset_training_file: expert_train_padded.pkl # path within data folder (no slashes)
+  dataset_test_file: expert_test_padded.pkl
+
   resy: 224 # the output of the data loader gets scaled to these dimensions
   resx: 224
 
@@ -18,7 +22,6 @@ data:
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
   batch_size: 3
-  path: data/data_roi # data folder path (no trailing slash)
 
 model:
   # currently only one model is supported

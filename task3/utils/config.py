@@ -19,6 +19,7 @@ import task3.utils.dataset
 reload(sys.modules['task3.utils.dataset'])
 from task3.utils.dataset import Dataset
 
+
 def init(config='configs/default.yaml'):
     # fix random seeds
     torch.manual_seed(42)
@@ -72,18 +73,20 @@ def get_data_loader(cfg, mode='train', get_subset=False):
 
     # split train and validation set according to https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
     if mode != 'submission':
-        #test_split = data_cfg.get('test_split', 0.2)
+        test_split = data_cfg.get('test_split', 0.2)
         validation_split = data_cfg.get('validation_split', 0.2)
 
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
         split = int(np.floor(validation_split * dataset_size))
-        #test_size = int(np.floor(test_split * dataset_size))
-        #train_size = int(np.floor((1 - validation_split) * (dataset_size - test_size)))
+        test_size = int(np.floor(test_split * dataset_size))
+        train_size = int(np.floor((1 - validation_split) * (dataset_size - test_size)))
         if shuffle:
             np.random.shuffle(indices)
-#        train_indices, test_indices, val_indices = indices[:train_size], indices[train_size:(train_size + test_size)], #indices[(train_size + test_size):]
+        train_indices, test_indices, val_indices = indices[:train_size], indices[
+                                                                         train_size:(train_size + test_size)], indices[(
+                                                                            train_size + test_size):]
         train_indices, val_indices = indices[split:], indices[:split]
 
         # Creating PT data samplers and loaders:
@@ -103,15 +106,15 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                                        sampler=valid_sampler
                                       )
 
-        #logger.debug('Dataset creation: test')
-        #test_sampler = SubsetRandomSampler(test_indices)
-        #test_loader = DataLoader(subset if get_subset else dataset,
-        #                               batch_size=batch_size,
-        #                               num_workers=num_workers,
-        #                               sampler=test_sampler
-        #                               )
+        logger.debug('Dataset creation: test')
+        test_sampler = SubsetRandomSampler(test_indices)
+        test_loader = DataLoader(subset if get_subset else dataset,
+                                       batch_size=batch_size,
+                                       num_workers=num_workers,
+                                       sampler=test_sampler
+                                       ) if test_size > 0 else None
         
-        return train_loader, validation_loader#, test_loader
+        return train_loader, validation_loader, test_loader
     
     else: # no sampling needed for test set
         data_loader = DataLoader(

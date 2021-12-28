@@ -55,7 +55,7 @@ class Dataset(torch.utils.data.Dataset):
         data = []
 
         # unzip and load dataset
-        samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
+        samples = load_zipped_pickle("{}/expert_train_padded.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/expert_test_padded.pkl".format(self.dataset_folder))
         print(samples[0].keys())
         if not self.is_submission:
             # Only use selected dataset

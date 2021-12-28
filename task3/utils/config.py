@@ -1,15 +1,36 @@
+from importlib import reload
+import sys
 import yaml
 import numpy as np
+import torch
+import random
 from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
 # changed to import dataset-roi file
-from task3.utils.datasetroi import Dataset
+from task3.utils.dataset import Dataset
 from torch import optim
 import segmentation_models_pytorch as smp
 from torchmetrics import IoU
 from torch.nn import BCEWithLogitsLoss, BCELoss
 from loguru import logger
+from task3.utils.logger import logger_init
 
+import task3.utils.dataset
+reload(sys.modules['task3.utils.dataset'])
+from task3.utils.dataset import Dataset
+
+def init(config='configs/default.yaml'):
+    # fix random seeds
+    torch.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
+    cfg = load_config(config)
+
+    # set logger format
+    logger_init(cfg['application'].get('log_level', 'DEBUG'))
+
+    return cfg
 
 @logger.catch
 def load_config(config):

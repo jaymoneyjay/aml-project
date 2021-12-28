@@ -1,23 +1,14 @@
-import numpy as np
-import torch
-from random import seed
-from .logger import logger_init
-from .config import load_config
 import os
 
-def init(config='configs/default.yaml'):
-    # fix random seeds
-    torch.manual_seed(42)
-    np.random.seed(42)
-    seed(42)
 
-    cfg = load_config(config)
+def dir_exists(path):
+    return os.path.exists(path)
 
-    # set logger format
-    logger_init(cfg['application'].get('log_level', 'DEBUG'))
 
-    return cfg
+def file_exists(path):
+    return os.path.isfile(path)
 
-def cond_mkdir(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
+
+def cond_mkdir(path):
+    if not dir_exists(path):
+        os.makedirs(path)

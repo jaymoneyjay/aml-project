@@ -1,5 +1,5 @@
 from task3.utils.data_utils import load_zipped_pickle
-from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img
+import task3.utils.img_utils
 
 from torchvision import transforms
 import numpy as np
@@ -7,6 +7,11 @@ import torch
 from torch.utils.data.dataloader import default_collate
 
 from loguru import logger
+
+from importlib import reload
+import sys
+reload(sys.modules['task3.utils.img_utils'])
+from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img
 
 
 class Dataset(torch.utils.data.Dataset):

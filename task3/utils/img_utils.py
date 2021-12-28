@@ -24,19 +24,40 @@ def mask_to_ratio(mask, height=3, width=4):
     else:
         new_dims = (round(box_props['box_dims'][1] * asp_ratio), box_props['box_dims'][1])
 
-    new_top_left = (box_props['center'][0] - round(new_dims[0] / 2), box_props['center'][1] - round(new_dims[1] / 2))
-    new_bottom_right = (new_top_left[0] + new_dims[0], new_top_left[1] + new_dims[1])
+    new_top_left = [box_props['center'][0] - round(new_dims[0] / 2), box_props['center'][1] - round(new_dims[1] / 2)]
+    new_bottom_right = [new_top_left[0] + new_dims[0], new_top_left[1] + new_dims[1]]
 
-    valid_rows = range(0, box_props['mask_dims'][0])
-    valid_cols = range(0, box_props['mask_dims'][1])
+    # check for coordinates outside img dimensions
+    y_max = box_props['mask_dims'][0]
+    x_max = box_props['mask_dims'][1]
+    valid_rows = range(0, y_max)
+    valid_cols = range(0, x_max)
 
-    # for now, raise an error when the new box would lie outside image
-    # TODO: Handle coordinates that are outside image
-    if new_top_left[0] not in valid_rows or new_top_left[1] not in valid_cols or new_bottom_right[0] not in valid_rows or new_bottom_right[1] not in valid_cols:
-        raise RuntimeError('When creating a new ROI box mask, the coordinates leave the valid coordinate range. --> see TODO in img_utils.py')
+    # y coords
+    if new_top_left[0] not in valid_rows:
+        new_bottom_right[0] += new_top_left[0]
+        new_top_left[0] = 0
+    elif new_bottom_right[0] not in valid_rows:
+        overhang = y_max - new_bottom_right[0]
+        new_top_left[0] += overhang
+        new_bottom_right[0] = y_max
+
+    # x coords
+    if new_top_left[1] not in valid_cols:
+        new_bottom_right[1] += new_top_left[1]
+        new_top_left[1] = 0
+    if new_bottom_right[1] not in valid_cols:
+        overhang = x_max - new_bottom_right[0]
+        new_top_left[1] += overhang
+        new_bottom_right[1] = x_max
 
     new_mask = np.zeros(box_props['mask_dims'], dtype=bool)
-    new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
+    try:
+        new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
+    except IndexError:
+        raise IndexError('When creating a new ROI box mask, the coordinates leave the valid coordinate range. '
+                         '--> more sophisticated handling of this is needed in img_utils.py')
+
     return new_mask
 
 
@@ -48,11 +69,12 @@ def resize_img(img, width=40, height=30):
     return resized
 
 
-def get_segment_crop(img,tol=0, mask=None):
+def get_segment_crop(img, tol=0, mask=None):
     """Get image crop based on a Boolean mask, following https://stackoverflow.com/a/53108489"""
     if mask is None:
         mask = img > tol
     return img[np.ix_(mask.any(1), mask.any(0))]
+
 
 def get_box_props(mask):
     """Returns a dict of properties for the ROI box mask"""
@@ -172,9 +194,10 @@ def show_img_batch(batch, list_titles=None, pred=None):
     if type(batch) is not dict:
         logger.warning('Could not visualize batch: No batch dict provided.')
         return
-    batch_frames = batch.get('frame_cropped', np.empty(0)) # ugly, ik... ;)
-    batch_labels = batch.get('label_cropped', np.empty(0)) if pred is not None else pred
-    logger.debug(batch_frames.shape)
+    batch_frames = batch.get('frame_cropped', np.empty(0))  # ugly, ik... ;)
+    batch_labels = batch.get('label_cropped', pred)
+    logger.debug('Shape of batch frames: {}; shape of batch labels {}', batch_frames.shape,
+                 batch_labels.shape if hasattr(batch_labels, 'shape') else batch_labels)
     to_plot = []
 
     if len(batch_frames.shape) == 4:
@@ -183,7 +206,7 @@ def show_img_batch(batch, list_titles=None, pred=None):
             to_plot.append(batch_frames[i, 0, :, :].numpy())
             if batch_labels is not None:
                 to_plot.append(batch_labels[i, 0, :, :].numpy())
-    elif batch_frames.shape == 3: # batch size 1
+    elif batch_frames.shape == 3:  # batch size 1
         to_plot = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
             to_plot.append(batch_labels[0, :, :].numpy())

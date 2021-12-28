@@ -21,7 +21,8 @@ data:
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
-  batch_size: 3
+  test_split: 0
+  batch_size: 3 # training only
 
 model:
   # currently only one model is supported

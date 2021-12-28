@@ -1,5 +1,5 @@
-from task3.utils.data_utils import load_zipped_pickle
-from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img
+from importlib import reload
+import sys
 
 from torchvision import transforms
 import numpy as np
@@ -7,6 +7,16 @@ import torch
 from torch.utils.data.dataloader import default_collate
 
 from loguru import logger
+
+from task3.utils.utils import file_exists
+import task3.utils.data_utils, task3.utils.img_utils, task3.utils.roi_prediction
+reload(sys.modules['task3.utils.data_utils'])
+reload(sys.modules['task3.utils.img_utils'])
+reload(sys.modules['task3.utils.roi_prediction'])
+
+from task3.utils.data_utils import load_zipped_pickle, save_zipped_pickle
+from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img, normalize_expert_dimensions
+from task3.utils.roi_prediction import get_box_for_video, get_windows_and_heatmap
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -36,6 +46,8 @@ class Dataset(torch.utils.data.Dataset):
 
         # read data config
         self.dataset_folder = data_cfg.get('path', 'data')
+        self.train_data_path = "{}/train.pkl".format(self.dataset_folder)
+        self.submission_data_path = "{}/test.pkl".format(self.dataset_folder)
         self.exclude_samples = excl_samples
         self.include_samples = incl_samples
         self.mode = mode
@@ -46,6 +58,27 @@ class Dataset(torch.utils.data.Dataset):
         self.only_annotated = data_cfg.get('only_annotated', True)
         self.transformations = transformations
         self.samples = []
+
+        # Load heatmap for box predictions
+        if self.is_submission:
+            box_heatmap_path = "{}/{}".format(self.dataset_folder,
+                                              data_cfg.get('box_heatmap_filename', 'box_heatmap.pkl'))
+            logger.info('Looking for heatmap "{}"', box_heatmap_path)
+            if file_exists(box_heatmap_path):
+                w_and_h = load_zipped_pickle(box_heatmap_path)
+                self.heatmap = w_and_h['heatmap']
+                self.windows = w_and_h['windows']
+                logger.info('Loaded heatmap file "{}"', box_heatmap_path)
+            else:
+                train_samples = load_zipped_pickle(self.train_data_path)
+                expert_samples = list(filter(lambda d: d['dataset'] == 'expert', train_samples))
+                normalize_expert_dimensions(expert_samples)
+                w_and_h = get_windows_and_heatmap(expert_samples)
+                self.heatmap = w_and_h['heatmap']
+                self.windows = w_and_h['windows']
+                save_zipped_pickle(w_and_h, box_heatmap_path)
+                logger.info('New heatmap created under "{}"', box_heatmap_path)
+
         self.data = self._prepare_files()
 
         logger.debug('Exclude samples: {}, include samples: {}, applied transforms: {}', self.exclude_samples,
@@ -55,10 +88,11 @@ class Dataset(torch.utils.data.Dataset):
         data = []
 
         # unzip and load dataset
-        samples = load_zipped_pickle("{}/train.pkl".format(self.dataset_folder)) if not self.is_submission else load_zipped_pickle("{}/test.pkl".format(self.dataset_folder))
 
+        samples = load_zipped_pickle(self.train_data_path) if not self.is_submission else load_zipped_pickle(self.submission_data_path)
+
+        # Only use selected samples from dataset
         if not self.is_submission:
-            # Only use selected dataset
             if self.dataset is not None:
                 samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
 
@@ -82,26 +116,26 @@ class Dataset(torch.utils.data.Dataset):
                         logger.warning('Sample name "{}" not found in configured dataset.', name)
                 samples = samples_temp
 
-        sample_names = []
-        for sample in samples:
-            sample_names.append(sample['name'])
-        logger.debug('Loaded samples: {}', sample_names)
+        logger.debug('Loaded samples: {}', [sample['name'] for sample in samples])
 
         self.samples = samples
 
-        # flatten samples to obtain dataset
-        # TODO KeyError: 'frames' when loading test dataset
+        # flatten each sample (video -> frame) to obtain dataset
         for sample in samples:
-            for i in range(sample['video'].shape[-1]):
-                frame = sample['video'][:, :, i]
+            video = sample['video']
+            box = get_box_for_video(video, self.windows, self.heatmap, w_dims=self.img_size) if self.is_submission else sample['box']
+            logger.debug('box: {}', box)
+
+            for i in range(video.shape[-1]):
+                frame = video[:, :, i]
                 label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
                 if not self.only_annotated or label is not None or self.is_submission:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
                         'frame': frame.astype(np.uint8), 
-                        'box': sample['box'] if not self.is_submission else None,
+                        'box': box,
                         'dataset': sample['dataset'] if not self.is_submission else None,
-                        'label': label, # bool
+                        'label': label,  # bool
                     })
 
         return data
@@ -147,13 +181,14 @@ class Dataset(torch.utils.data.Dataset):
         else:
             resized_frame = resize_img(frame, width=self.img_size[1], height=self.img_size[0])
 
+        # new_mask_props = get_box_props(new_mask)
+
         if self.is_submission:
             return {
                 'id': item['id'],
                 'frame_cropped': resized_frame,
             }
         else:
-
             item_out = {
                 'id': item['id'],
                 'frame_cropped': resized_frame,

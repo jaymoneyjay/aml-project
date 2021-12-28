@@ -1,22 +1,23 @@
 application:
-  log_level: 'DEBUG' # one of ['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL']
+  log_level: 'DEBUG' # one of ['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'], default: DEBUG
 
 data:
+  path: data # data folder path (no trailing slash)
+  box_heatmap_filename: box_heatmap.pkl # pickle file within data folder; for roi prediction; if the file doesn't exist, a new heatmap will be saved by this name
+
   resy: 30 # the output of the data loader gets scaled to these dimensions
   resx: 40
 
   asp_y: 3
   asp_x: 4 # desired aspect ratio; ideally, this matches the aspect ratio of resy/resx
 
-  # if null, loads all 65 samples
-  exclude_samples: null
+  exclude_samples: null  # if null, loads all 65 samples
   include_samples: null
   dataset: expert # possible values: amateur, expert, null (null includes both datasets; training only)
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
   test_split: 0.2 # some guidance on choosing optimal splits: https://stackoverflow.com/a/13623707/3142478; size of training (incl. validation) set is 1-test_split
   validation_split: 0.2 # size of validation set (calculated after splitting the training set into test and train sets)
-  path: data # data folder path (no trailing slash)
 
 model:
   smp-unet: # https://segmentation-modelspytorch.readthedocs.io/en/latest/

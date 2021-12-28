@@ -37,6 +37,7 @@ def mask_to_ratio(mask, height=3, width=4):
     new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
     return new_mask
 
+
 def resize_img(img, width=40, height=30):
     """Resizes 2D Numpy array to given dimensions"""
     # could also try different interpolations such as INTER_CUBIC: https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/
@@ -44,11 +45,13 @@ def resize_img(img, width=40, height=30):
     resized = cv2.resize(img, dsize=(width, height), interpolation=cv2.INTER_AREA)
     return resized
 
-def get_segment_crop(img,tol=0, mask=None):
+
+def get_segment_crop(img, tol=0, mask=None):
     """Get image crop based on a Boolean mask, following https://stackoverflow.com/a/53108489"""
     if mask is None:
         mask = img > tol
     return img[np.ix_(mask.any(1), mask.any(0))]
+
 
 def get_box_props(mask):
     """Returns a dict of properties for the ROI box mask"""
@@ -79,6 +82,103 @@ def get_box_props(mask):
     box_props['mask_dims'] = mask.shape
 
     return box_props
+
+
+def get_transform(center, scale, res, rot=0):
+    """Generate transformation matrix."""
+    h = 200 * scale
+    t = np.zeros((3, 3))
+    t[0, 0] = float(res[1]) / h
+    t[1, 1] = float(res[0]) / h
+    t[0, 2] = res[1] * (-float(center[0]) / h + .5)
+    t[1, 2] = res[0] * (-float(center[1]) / h + .5)
+    t[2, 2] = 1
+    if not rot == 0:
+        rot = -rot  # To match direction of rotation from cropping
+        rot_mat = np.zeros((3, 3))
+        rot_rad = rot * np.pi / 180
+        sn, cs = np.sin(rot_rad), np.cos(rot_rad)
+        rot_mat[0, :2] = [cs, -sn]
+        rot_mat[1, :2] = [sn, cs]
+        rot_mat[2, 2] = 1
+        # Need to rotate around center
+        t_mat = np.eye(3)
+        t_mat[0, 2] = -res[1] / 2
+        t_mat[1, 2] = -res[0] / 2
+        t_inv = t_mat.copy()
+        t_inv[:2, 2] *= -1
+        t = np.dot(t_inv, np.dot(rot_mat, np.dot(t_mat, t)))
+    return t
+
+
+def transform(pt, center, scale, res, invert=0, rot=0):
+    """Transform pixel location to different reference."""
+    t = get_transform(center, scale, res, rot)
+    if invert:
+        t = np.linalg.inv(t)
+    new_pt = np.array([pt[0] - 1, pt[1] - 1, 1.]).T
+    new_pt = np.dot(t, new_pt)
+    return new_pt[:2].astype(int) + 1
+
+
+def transform_and_crop(img, center, scale, res, rot=0):
+    """Crop image according to the supplied bounding box."""
+    # Upper left point
+    ul = np.array(transform([1, 1], center, scale, res, invert=1)) - 1
+    # Bottom right point
+    br = np.array(transform([res[0] + 1, res[1] + 1], center, scale, res, invert=1)) - 1
+
+    new_shape = [br[1] - ul[1], br[0] - ul[0]]
+    if len(img.shape) > 2:
+        new_shape += [img.shape[2]]
+    new_img = np.zeros(new_shape, dtype=np.uint8)
+
+    # Range to fill new array
+    new_x = max(0, -ul[0]), min(br[0], len(img[0])) - ul[0]
+    new_y = max(0, -ul[1]), min(br[1], len(img)) - ul[1]
+
+    # Range to sample from original image
+    old_x = max(0, ul[0]), min(len(img[0]), br[0])
+    old_y = max(0, ul[1]), min(len(img), br[1])
+    new_img[new_y[0]:new_y[1], new_x[0]:new_x[1]] = img[old_y[0]:old_y[1], old_x[0]:old_x[1]]
+
+    if not rot == 0:
+        rot_mat = cv2.getRotationMatrix2D((center[0], center[1]), rot, scale)
+        new_img = cv2.warpAffine(new_img, rot_mat, res)
+        # Remove padding
+        ###rot_dict = {
+        ###90: cv2.ROTATE_90_CLOCKWISE,
+        ###180: cv2.ROTATE_180,
+        ###270: cv2.ROTATE_90_COUNTERCLOCKWISE
+        ###}
+        ###new_img = cv2.rotate(new_img, rot_dict[rot])
+
+    new_img = cv2.resize(new_img, res)
+
+    return new_img
+
+
+def crop_frame_to_dims(frame, dims=(112, 112)):  ## TODO
+    pass
+
+
+def normalize_expert_dimensions(samples):
+    # get the minimum x and y dims
+    min_dims = [2000, 2000]
+    for sample in samples:
+        box_shape = sample['box'].shape
+        for i in range(2):
+            if box_shape[i] < min_dims[i]:
+                min_dims[i] = box_shape[i]
+
+    logger.debug('min_dims of expert set: {}', min_dims)
+
+    # cropping images: aligning cropping frame vertically to bottom and horizontally to middle
+    for sample in samples:
+        sample['box_resized'] = resize_img(sample['box'])
+
+    return samples, tuple(min_dims)
+
 
 def show_img(img):
     plt.imshow(img, interpolation=None)
@@ -161,6 +261,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
 
     fig.tight_layout()
     _ = plt.show()
+
 
 def show_img_batch(batch, list_titles=None):
     batch_frames = batch['frame_cropped']

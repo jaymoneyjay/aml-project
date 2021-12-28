@@ -1,10 +1,33 @@
+from importlib import reload
+import sys
+
 import yaml
 import numpy as np
 from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
-from task3.utils.dataset import Dataset
+
+from task3.utils.logger import logger_init
 from loguru import logger
 from torch import optim
+import torch
+import random
+
+import task3.utils.dataset
+reload(sys.modules['task3.utils.dataset'])
+from task3.utils.dataset import Dataset
+
+def init(config='configs/default.yaml'):
+    # fix random seeds
+    torch.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
+    cfg = load_config(config)
+
+    # set logger format
+    logger_init(cfg['application'].get('log_level', 'DEBUG'))
+
+    return cfg
 
 @logger.catch
 def load_config(config):

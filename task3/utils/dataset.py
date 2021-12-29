@@ -114,6 +114,7 @@ class Dataset(torch.utils.data.Dataset):
                 frame = sample['video'][:, :, i].astype(np.uint8)
                 label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
                 box = None
+                orig_frame_dims = frame.shape
 
                 if not self.is_submission:
                     box = sample['box']
@@ -128,6 +129,7 @@ class Dataset(torch.utils.data.Dataset):
                         'box':  box if not self.is_submission else None, # replace with 'roi'
                         'dataset': dataset,
                         'label': label if (not is_expert or label is None) else pad_to_dimensions(label, height=PAD_HEIGHT, width=PAD_WIDTH), # bool
+                        'orig_frame_dims': frame.shape
                     })
 
         return data
@@ -181,11 +183,12 @@ class Dataset(torch.utils.data.Dataset):
                 'id': item['id'],
                 'name': name,
                 'frame_cropped': resized_frame,
+                'orig_frame_dims': item['orig_frame_dims']
             }
 
         if self.orig_in_dl:
             normalizer = transforms.Compose([transforms.ToTensor()])  # transform to Tensor and 0-255 -> 0-1
-            item_out['frame_orig'] = normalizer(frame)
+            item_out['frame_orig'] = normalizer(frame)  # this is the padded frame for expert/mixed datasets
 
         if not self.is_submission:
             item_out['dataset'] = item['dataset']

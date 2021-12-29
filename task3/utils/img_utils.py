@@ -42,6 +42,19 @@ def pad_to_dimensions(img, height=112, width=112):
     padded = np.pad(img, ((0, y_padding), (0, x_padding)), mode='constant')
     return padded
 
+def unpad_to_dimensions(img, orig_dims=(112, 112)):
+    """
+    Removes padding from right and bottom of image (inverse of pad_to_dimensions).
+
+    :param img:
+    :param height: target height
+    :param width: target width
+    :return:
+    """
+
+    return img[:orig_dims[0], :orig_dims[1]]
+
+
 
 def np_to_opencv(img):
     """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
@@ -114,7 +127,7 @@ def get_segment_crop(img, tol=0, mask=None):
     return img[np.ix_(mask.any(1), mask.any(0))]
 
 
-def segment_crop_to_full_image(box_props, segment_crop, orig_image, bool_out=False):
+def segment_crop_to_full_image(box_props, segment_crop, orig_image, bool_out=False, orig_frame_dims=None):
     """
     Places a segment crop created with get_segment_crop back into the original image.
     :param dict box_props:
@@ -154,6 +167,9 @@ def segment_crop_to_full_image(box_props, segment_crop, orig_image, bool_out=Fal
 
     if bool_out:
         updated_image = updated_image >= 0.5
+
+    if type(orig_frame_dims) is tuple:
+        updated_image = unpad_to_dimensions(updated_image, orig_dims=orig_frame_dims)
 
     return updated_image
 
@@ -307,6 +323,8 @@ def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=F
     batch_frames_orig = batch.get('frame_orig', None)
     batch_labels = batch.get('label_cropped', pred)
     batch_box_props = batch.get('box_mask_props', None)
+    batch_orig_frame_dims_h = batch.get('orig_frame_dims', None)[0]
+    batch_orig_frame_dims_w = batch.get('orig_frame_dims', None)[1]
 
     logger.debug('Shape of batch frames: {}; shape of batch labels {}', batch_frames.shape,
                  batch_labels.shape if hasattr(batch_labels, 'shape') else batch_labels)
@@ -327,9 +345,11 @@ def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=F
                 if include_upscaled_labels:
                     n_cols = 4
                     box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
-                    upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool))
+                    orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
+                    print(orig_frame_dims)
+                    upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool), orig_frame_dims=orig_frame_dims)
                     if batch_frames_orig is not None:
-                        frame_orig = batch_frames_orig[i, 0, :, :].numpy()
+                        frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
                         to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
                     else:
                         to_plot.append(upscaled_label)

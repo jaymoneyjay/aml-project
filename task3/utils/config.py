@@ -4,11 +4,14 @@ import yaml
 import numpy as np
 import torch
 import random
+from functools import partial
 from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
 # changed to import dataset-roi file
 from task3.utils.dataset import Dataset
+from task3.utils.transforms_utils import *
 from torch import optim
+from torchvision import transforms
 import segmentation_models_pytorch as smp
 from torchmetrics import IoU
 from torch.nn import BCEWithLogitsLoss, BCELoss
@@ -195,3 +198,30 @@ def get_trainer(model, vis_dir, cfg, optimizer=None):
     else:
         raise Exception('Not supported.')
     return None
+
+
+def get_transforms(cfg):
+    lambda_elastic = partial(
+        elastic_transform,
+        alpha=cfg['elastic_transform__alpha'],
+        sigma=cfg['elastic_transform__sigma'],
+        alpha_affine=cfg['elastic_transform__alpha_affine']
+    )
+    transform_elastic = transforms.Compose([
+        transforms.Lambda(lambda_elastic),
+        transforms.Lambda(cv2_to_np)
+    ])
+
+    da_transforms = transforms.Compose([
+        transforms.RandomApply([transform_elastic], p=cfg['elastic_transform__p']),
+        transforms.ToPILImage('L'),
+        transforms.RandomAffine(30, translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale']),
+        transforms.RandomPerspective(distortion_scale=cfg['random_perspective__distortion_scale']),
+        transforms.ColorJitter(
+            brightness=cfg['color_jitter__brightness'],
+            contrast=cfg['color_jitter__contrast'],
+            saturation=cfg['color_jitter__saturation']
+            ),
+        transforms.PILToTensor()
+    ])
+    return da_transforms

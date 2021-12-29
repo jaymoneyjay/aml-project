@@ -1,23 +1,39 @@
-import numpy as np
-import torch
-from random import seed
-from .logger import logger_init
-from .config import load_config
 import os
+from torch import is_tensor
 
-def init(config='configs/default.yaml'):
-    # fix random seeds
-    torch.manual_seed(42)
-    np.random.seed(42)
-    seed(42)
+from loguru import logger
 
-    cfg = load_config(config)
+def dir_exists(path):
+    return os.path.exists(path)
 
-    # set logger format
-    logger_init(cfg['application'].get('log_level', 'DEBUG'))
 
-    return cfg
+def file_exists(path):
+    return os.path.isfile(path)
 
-def cond_mkdir(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
+
+def cond_mkdir(path):
+    if not dir_exists(path):
+        os.makedirs(path)
+
+def get_ith_element_from_dict_of_tensors(i, dictionary=None):
+    """ only shallow copies! """
+    if dictionary is None:
+        dictionary = {}
+    assert type(dictionary) is dict
+
+    copy = {}
+
+    for key in dictionary.keys():
+        val = dictionary[key]
+        if is_tensor(val):
+            copy[key] = val[i]
+        elif type(val) is list:
+            copy[key] = []
+            for tensor in val:
+                copy[key].append(tensor[i].item()) # change this for deeper data structures!
+            copy[key] = tuple(copy[key])
+        else:
+            copy[key] = val
+
+    logger.debug(copy)
+    return copy

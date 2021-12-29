@@ -2,12 +2,65 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from loguru import logger
-from torch import squeeze
+import task3.utils.utils
+import math
+
+from importlib import reload
+import sys
+
+reload(sys.modules['task3.utils.utils'])
+from task3.utils.utils import get_ith_element_from_dict_of_tensors
+
+def asp_ratio(img):
+    """
+    Returns the aspect ratio of a one channel image: height/width
+
+    :param img:
+    :return:
+    """
+    return round(img.shape[0] / img.shape[1], 2)
+
+
+def pad_to_dimensions(img, height=112, width=112):
+    """
+    Pads a 1 channel 2d numpy array to given width and height (added after)
+
+    :param img:
+    :param height:
+    :param width:
+    :return:
+    """
+    h = img.shape[0]
+    w = img.shape[1]
+
+    assert h <= height
+    assert w <= width
+
+    y_padding = height - h
+    x_padding = width - w
+
+    padded = np.pad(img, ((0, y_padding), (0, x_padding)), mode='constant')
+    return padded
+
+def unpad_to_dimensions(img, orig_dims=(112, 112)):
+    """
+    Removes padding from right and bottom of image (inverse of pad_to_dimensions).
+
+    :param img:
+    :param height: target height
+    :param width: target width
+    :return:
+    """
+
+    return img[:orig_dims[0], :orig_dims[1]]
+
+
 
 def np_to_opencv(img):
     """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
     uint_img = np.array(img, dtype=np.uint8)
     return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
+
 
 def mask_to_ratio(mask, height=3, width=4):
     """Takes 2D Boolean Numpy mask (Array) and returns corresponding mask with given aspect ratio"""
@@ -22,33 +75,104 @@ def mask_to_ratio(mask, height=3, width=4):
     else:
         new_dims = (round(box_props['box_dims'][1] * asp_ratio), box_props['box_dims'][1])
 
-    new_top_left = (box_props['center'][0] - round(new_dims[0] / 2), box_props['center'][1] - round(new_dims[1] / 2))
-    new_bottom_right = (new_top_left[0] + new_dims[0], new_top_left[1] + new_dims[1])
+    new_top_left = [box_props['center'][0] - round(new_dims[0] / 2), box_props['center'][1] - round(new_dims[1] / 2)]
+    new_bottom_right = [new_top_left[0] + new_dims[0], new_top_left[1] + new_dims[1]]
 
-    valid_rows = range(0, box_props['mask_dims'][0])
-    valid_cols = range(0, box_props['mask_dims'][1])
+    # check for coordinates outside img dimensions
+    y_max = box_props['mask_dims'][0]
+    x_max = box_props['mask_dims'][1]
+    valid_rows = range(0, y_max)
+    valid_cols = range(0, x_max)
 
-    # for now, raise an error when the new box would lie outside image
-    # TODO: Handle coordinates that are outside image
-    if new_top_left[0] not in valid_rows or new_top_left[1] not in valid_cols or new_bottom_right[0] not in valid_rows or new_bottom_right[1] not in valid_cols:
-        raise RuntimeError('When creating a new ROI box mask, the coordinates leave the valid coordinate range. --> see TODO in img_utils.py')
+    # y coords
+    if new_top_left[0] not in valid_rows:
+        new_bottom_right[0] += new_top_left[0]
+        new_top_left[0] = 0
+    elif new_bottom_right[0] not in valid_rows:
+        overhang = y_max - new_bottom_right[0]
+        new_top_left[0] += overhang
+        new_bottom_right[0] = y_max
+
+    # x coords
+    if new_top_left[1] not in valid_cols:
+        new_bottom_right[1] += new_top_left[1]
+        new_top_left[1] = 0
+    if new_bottom_right[1] not in valid_cols:
+        overhang = x_max - new_bottom_right[0]
+        new_top_left[1] += overhang
+        new_bottom_right[1] = x_max
 
     new_mask = np.zeros(box_props['mask_dims'], dtype=bool)
-    new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
+    try:
+        new_mask[new_top_left[0]:new_bottom_right[0], new_top_left[1]:new_bottom_right[1]] = True
+    except IndexError:
+        raise IndexError('When creating a new ROI box mask, the coordinates leave the valid coordinate range. '
+                         '--> more sophisticated handling of this is needed in img_utils.py')
+
     return new_mask
 
-def resize_img(img, width=40, height=30):
+
+def resize_img(img, width=40, height=30, interpolation=cv2.INTER_AREA):
     """Resizes 2D Numpy array to given dimensions"""
     # could also try different interpolations such as INTER_CUBIC: https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/
     img = img.astype(np.uint8)
-    resized = cv2.resize(img, dsize=(width, height), interpolation=cv2.INTER_AREA)
+    resized = cv2.resize(img, dsize=(width, height), interpolation=interpolation)
     return resized
 
-def get_segment_crop(img,tol=0, mask=None):
+
+def get_segment_crop(img, tol=0, mask=None):
     """Get image crop based on a Boolean mask, following https://stackoverflow.com/a/53108489"""
     if mask is None:
         mask = img > tol
     return img[np.ix_(mask.any(1), mask.any(0))]
+
+
+def segment_crop_to_full_image(box_props, segment_crop, orig_image, bool_out=False, orig_frame_dims=None):
+    """
+    Places a segment crop created with get_segment_crop back into the original image.
+    :param dict box_props:
+    :param segment_crop:
+    :param orig_image:
+    :param bool bool_out:
+    :return updated_image:
+    """
+    box_dims = box_props['box_dims']
+    top_left = box_props['top_left']
+    bottom_right = box_props['bottom_right']
+    box_h = box_props['box_dims'][0]
+    box_w = box_props['box_dims'][1]
+
+    box_asp_ratio = round(box_dims[0] / box_dims[1], 1)
+    segment_asp_ratio = round(segment_crop.shape[0] / segment_crop.shape[1], 1)
+
+    try:
+        assert box_asp_ratio == segment_asp_ratio
+        assert box_props['mask_dims'] == orig_image.shape
+    except AssertionError:
+        raise AssertionError(
+            'box aspect ratio: {} <---> segment_crop aspect ratio: {} '
+            '// mask shape {} <---> orig_image shape: {}'.format(box_dims,
+                                                                    segment_crop.shape,
+                                                                    box_props[
+                                                                        'mask_dims'],
+                                                                    orig_image.shape))
+
+    upscaled_segment = resize_img(segment_crop, height=box_h, width=box_w, interpolation=cv2.INTER_NEAREST)
+    updated_image = orig_image
+
+    try:
+        updated_image[top_left[0]:bottom_right[0], top_left[1]:bottom_right[1]] = upscaled_segment[:, :]
+    except IndexError:
+        raise IndexError('When upscaling cropped image, index reached outside original image. Time to debug! ;)')
+
+    if bool_out:
+        updated_image = updated_image >= 0.5
+
+    if type(orig_frame_dims) is tuple:
+        updated_image = unpad_to_dimensions(updated_image, orig_dims=orig_frame_dims)
+
+    return updated_image
+
 
 def get_box_props(mask):
     """Returns a dict of properties for the ROI box mask"""
@@ -80,8 +204,35 @@ def get_box_props(mask):
 
     return box_props
 
+
+def overlay_bw_img(overlay, foundation, alpha=0.3):
+    """
+    Overlays one image over the other (black/white --> 1 channel images only)
+
+    :param overlay:
+    :param foundation:
+    :param alpha:
+    :return:
+    """
+    try:
+        assert overlay.shape == foundation.shape
+    except AssertionError:
+        AssertionError('dimension mismatch - overlay.shape: {}, foundation.shape: {}'.format(overlay.shape, foundation.shape))
+
+    blended_img = foundation + alpha * overlay
+    blended_img[blended_img > 1] = 1
+
+    return blended_img
+
+
 def show_img(img):
     plt.imshow(img, interpolation=None)
+    plt.show()
+
+
+def overlay_and_plot_img(overlay, foundation):
+    plt.imshow(foundation, interpolation=None)
+    plt.imshow(overlay, interpolation=None, alpha=0.3)
     plt.show()
 
 
@@ -96,7 +247,7 @@ def img_is_color(img):
 
 
 def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, num_cols=2, figsize=(20, 10),
-                    title_fontsize=30, interpolation=None):
+                    title_fontsize=30, interpolation=None, ignore_grayscale=False):
     '''
     Shows a grid of images, where each image is a Numpy array. The images can be either
     RGB or grayscale. Following https://stackoverflow.com/a/67992521
@@ -150,7 +301,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
     for i in range(num_images):
         img = list_images[i]
         title = list_titles[i] if list_titles is not None else 'Image %d' % (i)
-        cmap = list_cmaps[i] if list_cmaps is not None else (None if img_is_color(img) else 'gray')
+        cmap = list_cmaps[i] if list_cmaps is not None else (None if img_is_color(img) or ignore_grayscale else 'gray')
 
         list_axes[i].imshow(img, cmap=cmap, interpolation=interpolation)
         list_axes[i].set_title(title, fontsize=title_fontsize)
@@ -162,24 +313,55 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
     fig.tight_layout()
     _ = plt.show()
 
-def show_img_batch(batch, list_titles=None):
-    batch_frames = batch['frame_cropped']
-    batch_labels = batch.get('label_cropped', None)
-    logger.debug(batch_frames.shape)
-    to_plot = []
 
-    if len(batch_frames.shape) > 3:
+def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=False):
+    if type(batch) is not dict:
+        logger.warning('Could not visualize batch: No batch dict provided.')
+        return
+
+    batch_frames = batch.get('frame_cropped', np.empty(0))  # ugly, ik... ;)
+    batch_frames_orig = batch.get('frame_orig', None)
+    batch_labels = batch.get('label_cropped', pred)
+    batch_box_props = batch.get('box_mask_props', None)
+    batch_orig_frame_dims_h = batch.get('orig_frame_dims', None)[0]
+    batch_orig_frame_dims_w = batch.get('orig_frame_dims', None)[1]
+
+    logger.debug('Shape of batch frames: {}; shape of batch labels {}', batch_frames.shape,
+                 batch_labels.shape if hasattr(batch_labels, 'shape') else batch_labels)
+
+    to_plot = []
+    n_cols = 4
+
+    if len(batch_frames.shape) == 4:
         # batch of more than 1 element
         for i in range(batch_frames.shape[0]):
-            to_plot.append(batch_frames[i, 0, :, :].numpy())
+            frame = batch_frames[i, 0, :, :].numpy()
+            to_plot.append(frame)
             if batch_labels is not None:
-                to_plot.append(batch_labels[i, 0, :, :].numpy())
-    else:
+                n_cols = 3
+                current_label = batch_labels[i, 0, :, :].numpy()
+                to_plot.append(current_label)
+                to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
+                if include_upscaled_labels:
+                    n_cols = 4
+                    box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
+                    orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
+                    print(orig_frame_dims)
+                    upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool), orig_frame_dims=orig_frame_dims)
+                    if batch_frames_orig is not None:
+                        frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
+                        to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
+                    else:
+                        to_plot.append(upscaled_label)
+
+    elif batch_frames.shape == 3:  # batch size 1 # TODO: Handle this better --> same info content as above.
         to_plot = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
             to_plot.append(batch_labels[0, :, :].numpy())
+    else:
+        logger.warning('Could not visualize batch: Invalid batch dimensions.')
+        return
 
-    logger.debug(to_plot[0].shape)
+    figsize = (n_cols * 4.2, math.ceil(len(to_plot) / n_cols) * 4)
 
-    show_image_list(to_plot, num_cols=4, list_titles=list_titles)
-
+    show_image_list(to_plot, num_cols=n_cols, list_titles=list_titles, figsize=figsize, ignore_grayscale=True)

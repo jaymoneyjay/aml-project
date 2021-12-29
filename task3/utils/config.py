@@ -1,10 +1,37 @@
+from importlib import reload
+import sys
 import yaml
 import numpy as np
+import torch
+import random
 from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
+# changed to import dataset-roi file
 from task3.utils.dataset import Dataset
-from loguru import logger
 from torch import optim
+import segmentation_models_pytorch as smp
+from torchmetrics import IoU
+from torch.nn import BCEWithLogitsLoss, BCELoss
+from loguru import logger
+from task3.utils.logger import logger_init
+
+import task3.utils.dataset
+reload(sys.modules['task3.utils.dataset'])
+from task3.utils.dataset import Dataset
+
+
+def init(config='configs/default.yaml'):
+    # fix random seeds
+    torch.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
+    cfg = load_config(config)
+
+    # set logger format
+    logger_init(cfg['application'].get('log_level', 'DEBUG'))
+
+    return cfg
 
 @logger.catch
 def load_config(config):
@@ -52,11 +79,15 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         # Creating data indices for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
+        split = int(np.floor(validation_split * dataset_size))
         test_size = int(np.floor(test_split * dataset_size))
         train_size = int(np.floor((1 - validation_split) * (dataset_size - test_size)))
         if shuffle:
             np.random.shuffle(indices)
-        train_indices, test_indices, val_indices = indices[:train_size], indices[train_size:(train_size + test_size)], indices[(train_size + test_size):]
+        train_indices, test_indices, val_indices = indices[:train_size], indices[
+                                                                         train_size:(train_size + test_size)], indices[(
+                                                                            train_size + test_size):]
+        train_indices, val_indices = indices[split:], indices[:split]
 
         # Creating PT data samplers and loaders:
         logger.debug('Dataset creation: train')
@@ -81,7 +112,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                                        batch_size=batch_size,
                                        num_workers=num_workers,
                                        sampler=test_sampler
-                                       )
+                                       ) if test_size > 0 else None
         
         return train_loader, validation_loader, test_loader
     
@@ -97,25 +128,60 @@ def get_data_loader(cfg, mode='train', get_subset=False):
 
 
 def get_model(cfg):
-    # model = create_model(cfg)
-    #return model.to(device=cfg['device'])
-    pass
+    model = smp.Unet(**cfg['model'].get('smp-unet'))
+    params = cfg['model'].get('smp-unet')
+    logger.info(f'model params set to: {params}')
+
+    return model.to(device=cfg['device'])
 
 def get_optimizer(model, cfg):
     """ Create an optimizer. """
 
-    if cfg['training']['optimizer']['name'] == 'SGD':
+    if cfg['training']['optimizer'] == 'SGD':
         optimizer = optim.SGD(model.parameters(),
-                              lr=cfg['training']['optimizer'].get('lr', 1e-4))
-    elif cfg['training']['optimizer']['name'] == 'ADAM':
+                              lr=cfg['training'].get('lr', 1e-4),
+                              momentum=cfg['training'].get('momentum', 0.9))
+    elif cfg['training']['optimizer'] == 'Adam':
         optimizer = optim.Adam(params=model.parameters(),
-                                          lr=cfg['training']['optimizer'].get('lr', 5e-5),
+                                          lr=cfg['training'].get('lr', 5e-5),
                                           weight_decay=0)
     else:
         raise Exception('Not supported.')
 
     return optimizer
 
+def get_loss(model, cfg):
+    """Checks that last layer fits the choice of loss/ criterion."""
+    
+    loss = cfg['training']['loss']
+    
+    # BCEWithLogits = Sigmoid + BCELoss -> apparently numerically more stable 
+    if loss == 'bcewithlogitsloss':
+        assert cfg['model']['smp-unet']['activation'] == None, f'Last layer of the Unet model should not be sigmoid \
+        if you are using {loss}.'
+
+        criterion = BCEWithLogitsLoss(pos_weight=None)
+
+    elif loss == 'bce':    
+        assert cfg['model']['smp-unet']['activation'] == 'sigmoid', f'Last layer of the Unet model should be sigmoid \
+        if you are using {loss}.'
+
+        criterion = BCELoss()
+
+    elif loss == 'jaccard':
+        criterion = smp.utils.losses.JaccardLoss()
+    
+    elif loss == 'dice':
+        criterion = smp.utils.losses.DiceLoss()
+    else:
+        raise Exception('Not supported.')
+        
+    logger.info(f'Using {criterion} as loss function.')
+
+    return criterion
+
+def get_lrscheduler(optimizer, cfg):
+    pass
 
 def get_trainer(model, vis_dir, cfg, optimizer=None):
     """ Create a trainer instance. """

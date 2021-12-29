@@ -17,7 +17,7 @@ data:
   # if null, loads all 65 samples
   exclude_samples: null
   include_samples: null
-  dataset: expert # possible values: amateur, expert, null (null includes both datasets; training only)
+  dataset: null # possible values: amateur, expert, null (null includes both datasets; training only)
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size

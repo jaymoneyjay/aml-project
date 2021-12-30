@@ -131,8 +131,21 @@ def get_data_loader(cfg, mode='train', get_subset=False):
 
 
 def get_model(cfg):
-    model = smp.Unet(**cfg['model'].get('smp-unet'))
-    params = cfg['model'].get('smp-unet')
+    params = cfg['model'].get('params')
+
+    if cfg['model']['name'] == 'smp-unet':
+        model = smp.Unet(**params)
+
+    elif cfg['model']['name'] == 'smp-unet-plusplus':
+        model = smp.UnetPlusPlus(**params)
+
+    elif cfg['model']['name'] == 'smp-unet-deepv3+':
+        model = smp.DeepLabV3Plus(**params)
+
+    else:
+        raise Exception('Not supported.')    
+
+
     logger.info(f'model params set to: {params}')
 
     return model.to(device=cfg['device'])
@@ -160,13 +173,13 @@ def get_loss(model, cfg):
     
     # BCEWithLogits = Sigmoid + BCELoss -> apparently numerically more stable 
     if loss == 'bcewithlogitsloss':
-        assert cfg['model']['smp-unet']['activation'] == None, f'Last layer of the Unet model should not be sigmoid \
+        assert cfg['model']['params']['activation'] == None, f'Last layer of the Unet model should not be sigmoid \
         if you are using {loss}.'
 
         criterion = BCEWithLogitsLoss(pos_weight=None)
 
     elif loss == 'bce':    
-        assert cfg['model']['smp-unet']['activation'] == 'sigmoid', f'Last layer of the Unet model should be sigmoid \
+        assert cfg['model']['params']['activation'] == 'sigmoid', f'Last layer of the Unet model should be sigmoid \
         if you are using {loss}.'
 
         criterion = BCELoss()
@@ -184,7 +197,18 @@ def get_loss(model, cfg):
     return criterion
 
 def get_lrscheduler(optimizer, cfg):
-    pass
+    
+    if cfg['training']['lr_scheduler'] == 'steplr':
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+
+    elif cfg['training']['lr_scheduler'] == 'reduceonplateau':
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3,
+                                                   threshold=0.0001, threshold_mode='rel', cooldown=0,
+                                                   min_lr=0, eps=1e-08, verbose=False)
+    else:
+        raise Exception('Not supported.')
+    
+    return lr_scheduler
 
 def get_trainer(model, vis_dir, cfg, optimizer=None):
     """ Create a trainer instance. """

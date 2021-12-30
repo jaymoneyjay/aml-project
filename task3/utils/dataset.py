@@ -47,8 +47,8 @@ class Dataset(torch.utils.data.Dataset):
 
         # read data config
         self.dataset_folder = data_cfg.get('path', 'data')
-        self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_path', 'train.pkl'))
-        self.dataset_submission_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_submission_path', 'test.pkl'))
+        self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_file', 'train.pkl'))
+        self.dataset_submission_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_submission_file', 'test.pkl'))
         self.dataset_path = self.dataset_submission_path if self.is_submission else self.dataset_training_path
         self.exclude_samples = excl_samples
         self.include_samples = incl_samples

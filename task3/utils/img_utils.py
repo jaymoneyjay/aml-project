@@ -332,35 +332,33 @@ def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=F
     to_plot = []
     n_cols = 4
 
-    if len(batch_frames.shape) == 4:
-        # batch of more than 1 element
-        for i in range(batch_frames.shape[0]):
-            frame = batch_frames[i, 0, :, :].numpy()
-            to_plot.append(frame)
-            if batch_labels is not None:
-                n_cols = 3
-                current_label = batch_labels[i, 0, :, :].numpy()
-                to_plot.append(current_label)
-                to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
-                if include_upscaled_labels:
-                    n_cols = 4
-                    box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
-                    orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
-                    print(orig_frame_dims)
-                    upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool), orig_frame_dims=orig_frame_dims)
-                    if batch_frames_orig is not None:
-                        frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
-                        to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
-                    else:
-                        to_plot.append(upscaled_label)
-
-    elif batch_frames.shape == 3:  # batch size 1 # TODO: Handle this better --> same info content as above.
-        to_plot = [batch_frames[0, :, :].numpy()]
+    if batch_frames.shape == 3:  # if batch size is 1
+        batch_frames = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
-            to_plot.append(batch_labels[0, :, :].numpy())
-    else:
-        logger.warning('Could not visualize batch: Invalid batch dimensions.')
-        return
+            batch_labels = [batch_labels[0, :, :].numpy()]
+        if batch_frames_orig is not None:
+            batch_frames_orig = [batch_frames_orig[0, :, :].numpy()]
+
+    # batch of more than 1 element
+    for i in range(batch_frames.shape[0]):
+        frame = batch_frames[i, 0, :, :].numpy()
+        to_plot.append(frame)
+        if batch_labels is not None:
+            n_cols = 3
+            current_label = batch_labels[i, 0, :, :].numpy()
+            to_plot.append(current_label)
+            to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
+            if include_upscaled_labels:
+                n_cols = 4
+                box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
+                orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
+                print(orig_frame_dims)
+                upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool), orig_frame_dims=orig_frame_dims)
+                if batch_frames_orig is not None:
+                    frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
+                    to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
+                else:
+                    to_plot.append(upscaled_label)
 
     figsize = (n_cols * 4.2, math.ceil(len(to_plot) / n_cols) * 4)
 

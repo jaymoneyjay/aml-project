@@ -45,6 +45,8 @@ class Dataset(torch.utils.data.Dataset):
             if excl_samples is not None:
                 excl_samples = excl_samples.split(',')
 
+
+
         # read data config
         self.dataset_folder = data_cfg.get('path', 'data')
         self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_path', 'train.pkl'))
@@ -106,7 +108,6 @@ class Dataset(torch.utils.data.Dataset):
         self.samples = samples
 
         # flatten samples to obtain dataset
-        # TODO KeyError: 'frames' when loading test dataset
         for sample in samples:
             for i in range(sample['video'].shape[-1]):
                 dataset = 'expert' if self.is_submission else sample['dataset']
@@ -116,17 +117,16 @@ class Dataset(torch.utils.data.Dataset):
                 box = None
                 orig_frame_dims = frame.shape
 
-                if not self.is_submission:
-                    box = sample['box']
-                    if is_expert:
-                        box = pad_to_dimensions(box, height=PAD_HEIGHT, width=PAD_WIDTH)
+                box = sample.get('box', sample.get('roi', None))
+                if is_expert:
+                    box = pad_to_dimensions(box, height=PAD_HEIGHT, width=PAD_WIDTH)
 
                 if not self.only_annotated or label is not None or self.is_submission:
                     data.append({
                         'id': '{}_{}'.format(sample['name'], i),
                         'name': sample['name'],  # keep name as it is needed in evaluation function
                         'frame': frame if not is_expert else pad_to_dimensions(frame, height=PAD_HEIGHT, width=PAD_WIDTH),
-                        'box':  box if not self.is_submission else None, # replace with 'roi'
+                        'box':  box,
                         'dataset': dataset,
                         'label': label if (not is_expert or label is None) else pad_to_dimensions(label, height=PAD_HEIGHT, width=PAD_WIDTH), # bool
                         'orig_frame_dims': frame.shape
@@ -149,35 +149,30 @@ class Dataset(torch.utils.data.Dataset):
         name = item['name']
         frame = item['frame']
         label = item['label']
-        mask = item['box'] # TODO: ROI predicition included by new dataset and replacing sample key in _init_
+        mask = item['box']
 
         resized_label = None
         resized_frame = None
         new_mask_box_props = None
 
-        if not self.is_submission:
-            # crop frame to bounding box, then rescale to target resolution
-            new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
-            new_mask_box_props = get_box_props(new_mask)
-            cropped_frame = get_segment_crop(frame, mask=new_mask)
-            resized_frame = resize_img(cropped_frame, width=self.img_size[1], height=self.img_size[0])
+        # crop frame to bounding box, then rescale to target resolution
+        new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
+        new_mask_box_props = get_box_props(new_mask)
+        cropped_frame = get_segment_crop(frame, mask=new_mask)
+        resized_frame = resize_img(cropped_frame, width=self.img_size[1], height=self.img_size[0])
 
-            # crop label to bounding box, then rescale to target resolution
-            if label is not None:
-                cropped_label = get_segment_crop(label, mask=new_mask)
-                resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
-                resized_label = resized_label.astype(bool) # np.bool depreciated
-            # check to see if we are applying any transformations
-            if self.transformations is not None:
-                # apply the transformations to both image and its mask
-                resized_frame = self.transformations(resized_frame)
+        # crop label to bounding box, then rescale to target resolution
+        if label is not None:
+            cropped_label = get_segment_crop(label, mask=new_mask)
+            resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
+            resized_label = resized_label.astype(bool) # np.bool depreciated
+        # check to see if we are applying any transformations
+        if self.transformations is not None:
+            # apply the transformations to both image and its mask
+            resized_frame = self.transformations(resized_frame)
+            if resized_label is not None:
                 resized_label = self.transformations(resized_label)
-
-            assert resized_label.dtype == torch.bool
-        else:
-            resized_frame = resize_img(frame, width=self.img_size[1], height=self.img_size[0])
-            if self.transformations is not None:
-                resized_frame = self.transformations(resized_frame)
+                assert resized_label.dtype == torch.bool
 
         item_out = {
                 'id': item['id'],

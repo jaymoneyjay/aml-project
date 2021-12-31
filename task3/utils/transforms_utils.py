@@ -1,11 +1,18 @@
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 import cv2
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
+from loguru import logger
 
 def cv2_to_np(img):
     return img[..., 0]
+
+def np_to_opencv(img):
+    """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
+    uint_img = np.array(img, dtype=np.uint8)
+    return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
 
 # Function to distort image
 def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
@@ -20,8 +27,10 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     if random_state is None:
         random_state = np.random.RandomState(None)
 
-    
-    image = cv2.cvtColor(image, cv2.CV_8U)
+    assert isinstance(image, np.ndarray)
+
+    is_bool = image.dtype == bool
+    image = np_to_opencv(image)  # PREVIOUSLY: image = cv2.cvtColor(image, cv2.CV_8U)
     shape = image.shape
     shape_size = shape[:2]
 
@@ -44,5 +53,8 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
     indices = np.reshape(y+dy, (-1, 1)), np.reshape(x+dx, (-1, 1)), np.reshape(z, (-1, 1))
     img_transformed = map_coordinates(image, indices, order=1, mode='reflect').reshape(shape)
-    
+
+    if is_bool:
+        img_transformed = image.astype(bool)
+
     return img_transformed

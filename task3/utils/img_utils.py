@@ -11,6 +11,7 @@ import sys
 reload(sys.modules['task3.utils.utils'])
 from task3.utils.utils import get_ith_element_from_dict_of_tensors
 
+
 def asp_ratio(img):
     """
     Returns the aspect ratio of a one channel image: height/width
@@ -42,6 +43,7 @@ def pad_to_dimensions(img, height=112, width=112):
     padded = np.pad(img, ((0, y_padding), (0, x_padding)), mode='constant')
     return padded
 
+
 def unpad_to_dimensions(img, orig_dims=(112, 112)):
     """
     Removes padding from right and bottom of image (inverse of pad_to_dimensions).
@@ -53,13 +55,6 @@ def unpad_to_dimensions(img, orig_dims=(112, 112)):
     """
 
     return img[:orig_dims[0], :orig_dims[1]]
-
-
-
-def np_to_opencv(img):
-    """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
-    uint_img = np.array(img, dtype=np.uint8)
-    return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
 
 
 def mask_to_ratio(mask, height=3, width=4):

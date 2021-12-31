@@ -5,8 +5,8 @@ device: cpu # cpu or cuda (for gpu); train on cpu or gpu
 
 data:
   path: data/data_roi # data folder path (no trailing slash)
-  dataset_training_file: expert_train_padded.pkl # path within data folder (no slashes)
-  dataset_test_file: expert_test_padded.pkl
+  dataset_training_path: expert_train_padded.pkl # path within data folder (no slashes)
+  dataset_submission_path: expert_test_padded.pkl
 
   resy: 224 # the output of the data loader gets scaled to these dimensions
   resx: 224
@@ -26,7 +26,8 @@ data:
 
 model:
   # currently only one model is supported
-  smp-unet: # https://segmentation-modelspytorch.readthedocs.io/en/latest/
+  name: smp-unet-plusplus
+  params:
     encoder_name: resnet34
     encoder_weights: null
     in_channels: 1
@@ -34,24 +35,46 @@ model:
     encoder_depth: 5
     decoder_use_batchnorm: True
     decoder_channels: [256, 128, 64, 32, 16]
-    decoder_attention_type: null
+    decoder_attention_type: null #scse: boosting meaningful features while suppressing weak ones.
     activation: sigmoid
     aux_params: null
-
+  #name: smp-unet-plusplus # Decoder of Unet++ is more complex than in usual Unet.
+  #encoder_name: efficientnet-b3
+  #encoder_weights: null #imagenet
+  #in_channels: 1
+  #classes: 1 # we only need one output channel showing True/False
+  #encoder_depth: 5
+  #decoder_use_batchnorm: True
+  #decoder_channels: [256, 128, 64, 32, 16]
+  #decoder_attention_type: null # scse
+  #activation: sigmoid
+  #aux_params: null
+ 
+  #name: smp-unet-deepv3+ # Decoder of Unet++ is more complex than in usual Unet.
+  #encoder_name: resnet101
+  #encoder_weights: null #imagenet
+  #in_channels: 1
+  #classes: 1 # we only need one output channel showing True/False
+  #encoder_depth: 5
+  #decoder_use_batchnorm: True
+  #decoder_channels: [256, 128, 64, 32, 16]
+  #decoder_attention_type: null # scse
+  #activation: sigmoid
+  #aux_params: null 
 training: # only batch sized used, so far
   optimizer: Adam
-  lr: 0.0005 # was set to 0.00005 before
+  lr: 0.005 # was set to 0.00005 before
   momentum: 0.9
 #https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.StepLR.html and #https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html
-  lr_scheduler: steplr # not implemented yet; schedule lr, use steplr or reduceonplateau 
+  lr_scheduler: steplr #schedule lr, use steplr or reduceonplateau 
   #sgd:
   #lr: 0.0001
   loss: bce # use BCE() or jaccard loss (as this is a direct proxy to IoU); choose between BCEWithLogits(), BCE(). JaccardLoss(), DiceLoss()
   metric: pytorch_iou # TODO add evaluation method from project page
-  epochs: 100
+  epochs: 50
   num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
-  save_path: runs/mitrial_valve_training_6 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
-
+  save_path: runs/mv_training_7 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
+run_notes: 'resnet34 unet++ batchsize reduced again, no attention'
 
 transforms:
   elastic_transform__alpha: 1.5
@@ -64,4 +87,3 @@ transforms:
   color_jitter__brightness: 0.1
   color_jitter__contrast: 0.1
   color_jitter__saturation: 0.1
-  

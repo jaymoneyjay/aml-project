@@ -99,6 +99,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                                   batch_size=batch_size,
                                   num_workers=num_workers,
                                   sampler=train_sampler,
+                                  drop_last=True
                                   )
 
         logger.debug('Dataset creation: validation')
@@ -106,7 +107,8 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         validation_loader = DataLoader(subset if get_subset else dataset, 
                                        batch_size=batch_size,
                                        num_workers=num_workers,
-                                       sampler=valid_sampler
+                                       sampler=valid_sampler,
+                                       drop_last=True
                                       )
 
         logger.debug('Dataset creation: test')

@@ -12,6 +12,19 @@ reload(sys.modules['task3.utils.utils'])
 from task3.utils.utils import get_ith_element_from_dict_of_tensors
 
 
+def plot_histogram(img):
+    if not isinstance(img, np.ndarray):
+        img = np.array(img)
+
+    if img.dtype is bool:
+        img = img.astype(np.uint8)
+
+    plt.hist(img.ravel(), bins=50, density=True)
+    plt.xlabel("pixel values")
+    plt.ylabel("relative frequency")
+    plt.title("distribution of pixels")
+    plt.show()
+
 def asp_ratio(img):
     """
     Returns the aspect ratio of a one channel image: height/width
@@ -337,6 +350,7 @@ def show_img_batch(batch, list_titles=None, pred=None):
     # batch of more than 1 element
     for i in range(batch_frames.shape[0]):
         frame = batch_frames[i, 0, :, :].numpy()
+        plot_histogram(frame)
         to_plot.append(frame)
 
         n_cols = 4

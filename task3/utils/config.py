@@ -254,6 +254,6 @@ def get_transforms(cfg):
             contrast=cfg['color_jitter__contrast'],
             saturation=cfg['color_jitter__saturation']
             ),
-        transforms.PILToTensor()
+        transforms.ToTensor(),  # TODO: Include normalization
     ])
     return da_transforms

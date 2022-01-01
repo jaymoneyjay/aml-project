@@ -6,13 +6,20 @@ from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 from loguru import logger
 
+
 def cv2_to_np(img):
     return img[..., 0]
+
 
 def np_to_opencv(img):
     """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
     uint_img = np.array(img, dtype=np.uint8)
     return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
+
+
+def tensor_to_float(tensor):
+    return tensor.float()
+
 
 # Function to distort image
 def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):

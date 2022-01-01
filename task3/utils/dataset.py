@@ -11,7 +11,7 @@ from loguru import logger
 from importlib import reload
 import sys
 reload(sys.modules['task3.utils.img_utils'])
-from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img, get_box_props, pad_to_dimensions
+from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img, get_box_props, pad_to_dimensions, plot_histogram
 
 class Dataset(torch.utils.data.Dataset):
     """ Dataset class"""
@@ -107,11 +107,15 @@ class Dataset(torch.utils.data.Dataset):
 
         # flatten samples to obtain dataset
         for sample in samples:
-            for i in range(sample['video'].shape[-1]):
+            video = sample['video']
+            sample_mean = np.mean(video)
+            sample_std = np.std(video)
+
+            for i in range(video.shape[-1]):
                 dataset = 'expert' if self.is_submission else sample['dataset']
                 is_expert = dataset == 'expert' or self.dataset is None
-                frame = sample['video'][:, :, i].astype(np.uint8)
-                label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
+                frame = video[:, :, i].astype(np.uint8)
+                label = video[:, :, i] if not self.is_submission and i in sample['frames'] else None
                 box = None
                 orig_frame_dims = frame.shape
 
@@ -127,7 +131,9 @@ class Dataset(torch.utils.data.Dataset):
                         'box':  box,
                         'dataset': dataset,
                         'label': label if (not is_expert or label is None) else pad_to_dimensions(label, height=PAD_HEIGHT, width=PAD_WIDTH), # bool
-                        'orig_frame_dims': frame.shape
+                        'orig_frame_dims': frame.shape,
+                        'mean': sample_mean,
+                        'std': sample_std,
                     })
 
         return data

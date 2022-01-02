@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import cv2
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
+import torchvision.transforms.functional as tf
 from loguru import logger
+import random
+from functools import partial
+from torchvision.transforms import InterpolationMode
 
 
 def cv2_to_np(img):
@@ -34,7 +38,9 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     if random_state is None:
         random_state = np.random.RandomState(None)
 
-    assert isinstance(image, np.ndarray)
+    if len(image.shape) == 2:
+        image = np.expand_dims(image, axis=2)
+
 
     is_bool = image.dtype == bool
     image = np_to_opencv(image)  # PREVIOUSLY: image = cv2.cvtColor(image, cv2.CV_8U)
@@ -64,4 +70,66 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     if is_bool:
         img_transformed = image.astype(bool)
 
-    return img_transformed
+    return img_transformed[:, :, 0]
+
+
+def functional_transforms(image, cfg=None, mask=None):
+    if cfg is None:
+        logger.warning('No transformation settings provided; no transformations will be applied')
+        return None
+
+    # Random elastic transform
+    elastic = False # random.random() < cfg['elastic_transform__p']
+    seed = int(round(10000 * random.random()))
+    lambda_elastic = partial(
+        elastic_transform,
+        alpha=cfg['elastic_transform__alpha'],
+        sigma=cfg['elastic_transform__sigma'],
+        alpha_affine=cfg['elastic_transform__alpha_affine'],
+        random_state=np.random.RandomState(seed)
+    )
+    if elastic:
+        image = lambda_elastic(image)
+
+    image = tf.to_pil_image(image)
+
+    # Random horizontal flipping
+    hflip = random.random() > 0.5
+    if hflip:
+        image = tf.hflip(image)
+
+    # Random vertical flipping
+    vflip = random.random() > 0.5
+    if vflip:
+        image = tf.vflip(image)
+
+    affine =  random.random() > 0.5
+    lambda_affine = partial(tf.affine, angle=random.randrange(-15, 15), translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale'], shear=[random.randrange(-30, 30), random.randrange(-30, 30)], interpolation=InterpolationMode.NEAREST)
+    if affine:
+        image = lambda_affine(img=image)
+
+    """
+    perspective = random() > 0.5
+    if perspective:
+        image = tf.perspective(img=image, startpoints=[], endpoints=[], interpolation=InterpolationMode.NEAREST)
+    """
+    # TODO: Perspective
+    # TODO: ColorJitter?
+    # TODO: Random Cropping?
+
+    image = tf.to_tensor(image)
+
+    # Mask-safe transforms
+    if mask is not None:
+        mask = mask.astype(np.uint8)
+        if elastic:
+            mask = lambda_elastic(mask)
+        mask = tf.to_pil_image(mask)
+        if hflip:
+            mask = tf.hflip(mask)
+        if vflip:
+            mask = tf.vflip(mask)
+        if affine:
+            mask = lambda_affine(img=mask)
+        mask = tf.to_tensor(mask).bool()
+    return image, mask

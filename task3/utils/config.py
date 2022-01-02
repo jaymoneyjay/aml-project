@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, Subset, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
 # changed to import dataset-roi file
 from task3.utils.dataset import Dataset
-from task3.utils.transforms_utils import *
+import task3.utils.transforms_utils
 from torch import optim
 from torchvision import transforms
 import segmentation_models_pytorch as smp
@@ -21,7 +21,8 @@ from task3.utils.logger import logger_init
 import task3.utils.dataset
 reload(sys.modules['task3.utils.dataset'])
 from task3.utils.dataset import Dataset
-
+reload(sys.modules['task3.utils.transforms_utils'])
+from task3.utils.transforms_utils import elastic_transform, cv2_to_np, functional_transforms
 
 def init(config='configs/default.yaml'):
     # fix random seeds
@@ -54,11 +55,15 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     """
     assert mode in ['train', 'submission']
     data_cfg = cfg['data']
+
+    img_transforms = partial(functional_transforms, cfg=cfg.get('transforms', None))
+    if mode == 'submission':
+        img_transforms = to_scaled_tensor
         
     dataset = Dataset(
         data_cfg=data_cfg,
         mode=mode,
-        img_transforms=get_transforms(cfg.get('transforms', None))
+        img_transforms=img_transforms
     )
 
     batch_size = 1
@@ -127,7 +132,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                subset if get_subset else dataset,
                batch_size=batch_size,
                num_workers=num_workers,
-               shuffle=shuffle,
+               shuffle=False,
            )
             
         return data_loader
@@ -199,6 +204,11 @@ def get_loss(model, cfg):
 
     return criterion
 
+
+def to_scaled_tensor(image, mask=None):
+    return transforms.ToTensor()(image), None
+
+
 def get_lrscheduler(optimizer, cfg):
     
     if cfg['training']['lr_scheduler'] == 'steplr':
@@ -253,7 +263,7 @@ def get_transforms(cfg):
             brightness=cfg['color_jitter__brightness'],
             contrast=cfg['color_jitter__contrast'],
             saturation=cfg['color_jitter__saturation']
-            ),
-        transforms.ToTensor(),  # TODO: Include normalization
+        ),
+        transforms.ToTensor(),  # TODO: Include normalization to scale [0, 1]
     ])
     return da_transforms

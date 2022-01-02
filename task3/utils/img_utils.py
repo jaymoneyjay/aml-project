@@ -347,10 +347,10 @@ def show_img_batch(batch, list_titles=None, pred=None):
         if batch_frames_orig is not None:
             batch_frames_orig = [batch_frames_orig[0, :, :].numpy()]
 
-    # batch of more than 1 element
+    plot_histogram(batch_frames[0, 0, :, :].numpy())
+
     for i in range(batch_frames.shape[0]):
         frame = batch_frames[i, 0, :, :].numpy()
-        plot_histogram(frame)
         to_plot.append(frame)
 
         n_cols = 4

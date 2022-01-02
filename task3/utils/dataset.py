@@ -45,6 +45,8 @@ class Dataset(torch.utils.data.Dataset):
         # read data config
         self.dataset_folder = data_cfg.get('path', 'data')
         self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_path', 'train.pkl'))
+        self.dataset_amateur_training_path = "{}/{}".format(self.dataset_folder,
+                                                    data_cfg.get('dataset_amateur_training_path', 'amateur_train.pkl'))
         self.dataset_submission_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_submission_path', 'test.pkl'))
         self.dataset_path = self.dataset_submission_path if self.is_submission else self.dataset_training_path
         self.val_split = data_cfg['validation_split']
@@ -73,10 +75,13 @@ class Dataset(torch.utils.data.Dataset):
 
         # unzip and load dataset
         samples = load_zipped_pickle(self.dataset_path)
+
         logger.debug(samples[0].keys())
 
         if not self.is_submission:
             # Only use selected dataset
+            samples += load_zipped_pickle(self.dataset_amateur_training_path)  # TODO: only load amateur path if needed
+
             if self.dataset is not None:
                 samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
 

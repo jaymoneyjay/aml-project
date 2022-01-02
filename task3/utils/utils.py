@@ -2,6 +2,7 @@ import os
 from torch import is_tensor
 from torchvision import transforms
 import numpy as np
+import cv2
 
 from loguru import logger
 
@@ -41,6 +42,10 @@ def get_ith_element_from_dict_of_tensors(i, dictionary=None):
     return copy
 
 def upscale(frame, img_dims, roi_coord, roi_dims):
+
+    frame_resized = cv2.resize(frame, dsize=(250, 250))
+    frame_cropped = frame_resized[50:200, :]
+
     img_height, img_width = img_dims
     roi_height, roi_width = roi_dims
 
@@ -66,7 +71,7 @@ def upscale(frame, img_dims, roi_coord, roi_dims):
     #    frame = frame[:, :right]
     #    right = 0
     
-    f_pad = np.pad(frame, ((top, bottom), (left, right)), constant_values=0)
+    f_pad = np.pad(frame_cropped, ((top, bottom), (left, right)), constant_values=0)
     return f_pad
 
 def get_img_dims(df_meta, name):

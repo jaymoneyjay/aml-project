@@ -445,12 +445,11 @@ def show_img_batch(batch, list_titles=None, pred=None):
 def plot_pred_on_frame(frame, pred=None):
     to_plot = []
     n_cols = 1
-    frame = frame.numpy()
     to_plot.append(frame)
 
     if pred is not None:
         n_cols = 3
-        current_label = pred.numpy()
+        current_label = pred
         to_plot.append(current_label)
         to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
 

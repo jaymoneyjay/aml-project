@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 import cv2
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
-import torchvision.transforms.functional as tf
 from loguru import logger
 import random
 from functools import partial
 from torchvision.transforms import InterpolationMode
+from torchvision import transforms
+import torchvision.transforms.functional as tf
 
 
 def cv2_to_np(img):
@@ -24,6 +25,10 @@ def np_to_opencv(img):
 def tensor_to_float(tensor):
     return tensor.float()
 
+def to_scaled_tensor(image, mask=None):
+    if mask is None:
+        return transforms.ToTensor()(image), None
+    return transforms.ToTensor()(image), transforms.ToTensor()(mask).bool()
 
 # Function to distort image
 def elastic_transform(image, alpha, sigma, alpha_affine, seed=None):

@@ -1,6 +1,7 @@
 import os
 from torch import is_tensor
 from torchvision import transforms
+import numpy as np
 
 from loguru import logger
 
@@ -39,14 +40,19 @@ def get_ith_element_from_dict_of_tensors(i, dictionary=None):
     logger.debug(copy)
     return copy
 
-def upscale(frame, img_dims):
-    crop_transform = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.CenterCrop(img_dims),
-        transforms.PILToTensor()
-    ])
-
-    return crop_transform(frame)
+def upscale(frame, img_dims, roi_coord, roi_dims):
+    img_height, img_width = img_dims
+    roi_height, roi_width = roi_dims
+    x, y = roi_coord
+    
+    top = y
+    bottom = img_height - y - roi_height
+    
+    left = x
+    right = img_width - x - roi_width
+    
+    f_pad = np.pad(frame, ((top, bottom), (left, right)), constant_values=0)
+    return f_pad
 
 def get_img_dims(df_meta, name):
     sample_meta = df_meta[df_meta.name == name]

@@ -2,7 +2,6 @@ from task3.utils.data_utils import load_zipped_pickle
 import task3.utils.img_utils
 
 from torchvision import transforms
-import numpy as np
 import torch
 from torch.utils.data.dataloader import default_collate
 
@@ -11,7 +10,7 @@ from loguru import logger
 from importlib import reload
 import sys
 reload(sys.modules['task3.utils.img_utils'])
-from task3.utils.img_utils import get_segment_crop, mask_to_ratio, resize_img, get_box_props, pad_to_dimensions, plot_histogram
+from task3.utils.img_utils import *
 
 class Dataset(torch.utils.data.Dataset):
     """ Dataset class"""
@@ -26,16 +25,10 @@ class Dataset(torch.utils.data.Dataset):
         if data_cfg is None:
             data_cfg = {}
         self.is_submission = (mode == 'submission')
-        self.tensorize = transforms.Compose([transforms.ToTensor()])
 
         transformations = None
         if data_cfg.get('transforms', True):
-            if self.is_submission:
-                # basic transformation only for submission: transform to Tensor and 0-255 -> 0-1
-                transformations = self.tensorize  # transform to Tensor and 0-255 -> 0-1
-            elif transforms is not None:
-                # TODO add more transformations, i.e. augmentation
-                transformations = img_transforms
+            transformations = img_transforms
 
         incl_samples = data_cfg.get('include_samples', None)
         excl_samples = data_cfg.get('exclude_samples', None)
@@ -115,7 +108,7 @@ class Dataset(torch.utils.data.Dataset):
                 dataset = 'expert' if self.is_submission else sample['dataset']
                 is_expert = dataset == 'expert' or self.dataset is None
                 frame = video[:, :, i].astype(np.uint8)
-                label = video[:, :, i] if not self.is_submission and i in sample['frames'] else None
+                label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
                 box = None
                 orig_frame_dims = frame.shape
 
@@ -138,10 +131,6 @@ class Dataset(torch.utils.data.Dataset):
 
         return data
 
-    def do_transforms(self, img):
-        torch.tensor(img, dtype=torch.uint8)
-        return self.transforms(img)
-
     def __len__(self):
         """ Returns the length of the dataset. """
 
@@ -160,8 +149,6 @@ class Dataset(torch.utils.data.Dataset):
         mask = item['box']
 
         resized_label = None
-        resized_frame = None
-        new_mask_box_props = None
 
         # crop frame to bounding box, then rescale to target resolution
         new_mask = mask_to_ratio(mask, height=self.asp_ratio[0], width=self.asp_ratio[1])
@@ -173,15 +160,13 @@ class Dataset(torch.utils.data.Dataset):
         if label is not None:
             cropped_label = get_segment_crop(label, mask=new_mask)
             resized_label = resize_img(cropped_label, width=self.img_size[1], height=self.img_size[0])
-            resized_label = resized_label.astype(bool) # np.bool depreciated
-        # check to see if we are applying any transformations
+            resized_label = resized_label.astype(bool) # np.bool deprecated
+
+        # Transformsations
         if self.transforms is not None:
             # apply the transformations to both image and its mask
-            resized_frame = self.do_transforms(resized_frame)
+            resized_frame, resized_label = self.transforms(resized_frame, mask=resized_label)
             if resized_label is not None:
-                resized_label = np.array(resized_label, dtype=np.uint8)
-                resized_label = self.do_transforms(resized_label)
-                resized_label = resized_label.bool()
                 assert resized_label.dtype == torch.bool
 
         item_out = {
@@ -190,6 +175,14 @@ class Dataset(torch.utils.data.Dataset):
                 'frame_cropped': resized_frame,
                 'orig_frame_dims': item['orig_frame_dims']
             }
+
+        """
+        plt.imshow(resized_frame[0, :, :], interpolation=None)
+        plt.show()
+        if resized_label is not None:
+            plt.imshow(resized_label[0, :, :], interpolation=None)
+            plt.show()
+        """
 
         if self.orig_in_dl:
             normalizer = transforms.Compose([transforms.ToTensor()])  # transform to Tensor and 0-255 -> 0-1

@@ -22,7 +22,7 @@ data:
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
   test_split: 0.1
-  batch_size: 1 # training only
+  batch_size: 3 # training only
 
 model:
   # currently only one model is supported
@@ -34,7 +34,8 @@ model:
     classes: 1 # we only need one output channel showing True/False
     encoder_depth: 5
     decoder_use_batchnorm: True
-    decoder_channels: [256, 128, 64, 32, 16]
+    decoder_channels: [256, 128, 64, 32, 16] # TODO
+    # decoder_channels: [256, 128, 64, 32, 16]
     decoder_attention_type: scse #scse: boosting meaningful features while suppressing weak ones.
     activation: sigmoid
     aux_params: null
@@ -71,7 +72,7 @@ training: # only batch sized used, so far
   #lr: 0.0001
   loss: bce # use BCE() or jaccard loss (as this is a direct proxy to IoU); choose between BCEWithLogits(), BCE(). JaccardLoss(), DiceLoss()
   metric: pytorch_iou # TODO add evaluation method from project page
-  epochs: 100
+  epochs: 500
   num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
   save_path: runs/mv_training_15 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
 run_notes: 'unet++ with resnet34 and amateur net, testsplit 0.1, image transformations higher values'

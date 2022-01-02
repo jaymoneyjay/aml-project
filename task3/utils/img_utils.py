@@ -11,13 +11,16 @@ import sys
 reload(sys.modules['task3.utils.utils'])
 from task3.utils.utils import get_ith_element_from_dict_of_tensors
 
+
 def histogram_equalization(img):
     return cv2.equalizeHist(img)
+
 
 def adaptive_histogram_equalization(img, clip_limit=2.0, tile_grid_size=(8, 8)):
     """from https://docs.opencv.org/4.x/d5/daf/tutorial_py_histogram_equalization.html"""
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
     return clahe.apply(img)
+
 
 def plot_histogram(img):
     if not isinstance(img, np.ndarray):
@@ -31,6 +34,7 @@ def plot_histogram(img):
     plt.ylabel("relative frequency")
     plt.title("distribution of pixels")
     plt.show()
+
 
 def asp_ratio(img):
     """

@@ -72,8 +72,8 @@ class Dataset(torch.utils.data.Dataset):
 
     def _prepare_files(self):
         data = []
-        PAD_HEIGHT = 750
-        PAD_WIDTH = 1020
+        PAD_HEIGHT = 732
+        PAD_WIDTH = 1007
 
         # unzip and load dataset
         samples = load_zipped_pickle(self.dataset_path)

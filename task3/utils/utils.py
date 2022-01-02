@@ -43,13 +43,28 @@ def get_ith_element_from_dict_of_tensors(i, dictionary=None):
 def upscale(frame, img_dims, roi_coord, roi_dims):
     img_height, img_width = img_dims
     roi_height, roi_width = roi_dims
+
+    # Remove offset from padding
+    height_padded, width_padded = (732, 1007)
+    offset_y = (height_padded - img_height) // 2
+    offset_x = (width_padded - img_width) // 2
+
     x, y = roi_coord
+    x -= offset_x
+    y -= offset_y
     
     top = y
     bottom = img_height - y - roi_height
     
     left = x
     right = img_width - x - roi_width
+    
+    #if bottom < 0:
+    #    frame = frame[:bottom, :]
+    #    bottom = 0
+    #if right < 0:
+    #    frame = frame[:, :right]
+    #    right = 0
     
     f_pad = np.pad(frame, ((top, bottom), (left, right)), constant_values=0)
     return f_pad

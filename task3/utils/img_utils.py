@@ -11,6 +11,13 @@ import sys
 reload(sys.modules['task3.utils.utils'])
 from task3.utils.utils import get_ith_element_from_dict_of_tensors
 
+def histogram_equalization(img):
+    return cv2.equalizeHist(img)
+
+def adaptive_histogram_equalization(img, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """from https://docs.opencv.org/4.x/d5/daf/tutorial_py_histogram_equalization.html"""
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    return clahe.apply(img)
 
 def plot_histogram(img):
     if not isinstance(img, np.ndarray):
@@ -213,7 +220,7 @@ def get_box_props(mask):
     return box_props
 
 
-def overlay_bw_img(overlay, foundation, alpha=0.3):
+def overlay_bw_img(overlay, foundation, alpha=0.3, max_val=1):
     """
     Overlays one image over the other (black/white --> 1 channel images only)
 
@@ -228,7 +235,7 @@ def overlay_bw_img(overlay, foundation, alpha=0.3):
         AssertionError('dimension mismatch - overlay.shape: {}, foundation.shape: {}'.format(overlay.shape, foundation.shape))
 
     blended_img = foundation + alpha * overlay
-    blended_img[blended_img > 1] = 1
+    blended_img[blended_img > max_val] = max_val
 
     return blended_img
 
@@ -382,66 +389,6 @@ def show_img_batch(batch, list_titles=None, pred=None):
     show_image_list(to_plot, num_cols=n_cols, list_titles=list_titles, figsize=figsize, ignore_grayscale=True)
 
 
-def show_img_batch(batch, list_titles=None, pred=None):
-    if type(batch) is not dict:
-        logger.warning('Could not visualize batch: No batch dict provided.')
-        return
-
-    batch_frames = batch.get('frame_cropped', np.empty(0))  # ugly, ik... ;)
-    batch_frames_orig = batch.get('frame_orig', None)
-    batch_labels = batch.get('label_cropped', pred)
-    batch_box_props = batch.get('box_mask_props', None)
-    batch_orig_frame_dims_h = batch.get('orig_frame_dims', None)[0]
-    batch_orig_frame_dims_w = batch.get('orig_frame_dims', None)[1]
-
-    logger.debug('Shape of batch frames: {}; shape of batch labels {}', batch_frames.shape,
-                 batch_labels.shape if hasattr(batch_labels, 'shape') else batch_labels)
-
-    to_plot = []
-    n_cols = 4
-
-    if batch_frames.shape == 3:  # if batch size is 1
-        batch_frames = [batch_frames[0, :, :].numpy()]
-        if batch_labels is not None:
-            batch_labels = [batch_labels[0, :, :].numpy()]
-        if batch_frames_orig is not None:
-            batch_frames_orig = [batch_frames_orig[0, :, :].numpy()]
-
-    plot_histogram(batch_frames[0, 0, :, :].numpy())
-
-    for i in range(batch_frames.shape[0]):
-        frame = batch_frames[i, 0, :, :].numpy()
-        to_plot.append(frame)
-
-        n_cols = 4
-        box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
-        orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
-        logger.debug('original frame dims {}', orig_frame_dims)
-
-        if batch_labels is not None:
-            n_cols = 3
-            current_label = batch_labels[i, 0, :, :].numpy()
-            to_plot.append(current_label)
-            to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
-
-        if batch_frames_orig is not None:
-            n_cols = 4
-            frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
-
-            if batch_labels is not None:
-                upscaled_label = segment_crop_to_full_image(box_props, current_label,
-                                                            np.zeros(box_props['mask_dims'], dtype=bool),
-                                                            orig_frame_dims=orig_frame_dims)
-                to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
-
-            else:
-                to_plot.append(frame_orig)
-
-    figsize = (n_cols * 4.2, math.ceil(len(to_plot) / n_cols) * 4)
-
-    show_image_list(to_plot, num_cols=n_cols, list_titles=list_titles, figsize=figsize, ignore_grayscale=True)
-
-
 def plot_pred_on_frame(frame, pred=None):
     to_plot = []
     n_cols = 1
@@ -451,7 +398,7 @@ def plot_pred_on_frame(frame, pred=None):
         n_cols = 3
         current_label = pred
         to_plot.append(current_label)
-        to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
+        to_plot.append(overlay_bw_img(255 * current_label, frame, alpha=0.8, max_val=255))
 
     figsize = (n_cols * 4.2, math.ceil(len(to_plot) / n_cols) * 4)
 

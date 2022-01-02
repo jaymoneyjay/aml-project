@@ -4,9 +4,9 @@ application:
 device: cpu
 
 data:
-  path: data # data folder path (no trailing slash)
-  dataset_training_file: train.pkl # path within data folder (no slashes)
-  dataset_test_file: test.pkl
+  path: data/data_roi # data folder path (no trailing slash)
+  dataset_training_path: expert_train_padded.pkl # path within data folder (no slashes)
+  dataset_submission_path: expert_test_padded.pkl
 
   exclude_samples: null # if null, loads all 65 samples
   include_samples: null

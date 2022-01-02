@@ -58,6 +58,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     dataset = Dataset(
         data_cfg=data_cfg,
         mode=mode,
+        img_transforms=get_transforms(cfg.get('transforms', None))
     )
 
     batch_size = 1
@@ -99,6 +100,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                                   batch_size=batch_size,
                                   num_workers=num_workers,
                                   sampler=train_sampler,
+                                  drop_last=True
                                   )
 
         logger.debug('Dataset creation: validation')
@@ -106,7 +108,8 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         validation_loader = DataLoader(subset if get_subset else dataset, 
                                        batch_size=batch_size,
                                        num_workers=num_workers,
-                                       sampler=valid_sampler
+                                       sampler=valid_sampler,
+                                       drop_last=True
                                       )
 
         logger.debug('Dataset creation: test')
@@ -225,12 +228,17 @@ def get_trainer(model, vis_dir, cfg, optimizer=None):
 
 
 def get_transforms(cfg):
+    if cfg is None:
+        logger.warning('No transformation settings provided; no transformations will be applied')
+        return None
+
     lambda_elastic = partial(
         elastic_transform,
         alpha=cfg['elastic_transform__alpha'],
         sigma=cfg['elastic_transform__sigma'],
         alpha_affine=cfg['elastic_transform__alpha_affine']
     )
+
     transform_elastic = transforms.Compose([
         transforms.Lambda(lambda_elastic),
         transforms.Lambda(cv2_to_np)
@@ -238,7 +246,7 @@ def get_transforms(cfg):
 
     da_transforms = transforms.Compose([
         transforms.RandomApply([transform_elastic], p=cfg['elastic_transform__p']),
-        transforms.ToPILImage('L'),
+        transforms.ToPILImage(),
         transforms.RandomAffine(30, translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale']),
         transforms.RandomPerspective(distortion_scale=cfg['random_perspective__distortion_scale']),
         transforms.ColorJitter(
@@ -246,6 +254,6 @@ def get_transforms(cfg):
             contrast=cfg['color_jitter__contrast'],
             saturation=cfg['color_jitter__saturation']
             ),
-        transforms.PILToTensor()
+        transforms.ToTensor(),  # TODO: Include normalization
     ])
     return da_transforms

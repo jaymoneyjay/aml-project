@@ -41,7 +41,7 @@ def get_ith_element_from_dict_of_tensors(i, dictionary=None):
 
 def upscale(frame, img_dims):
     crop_transform = transforms.Compose([
-        transforms.ToPILImage('L'),
+        transforms.ToPILImage(),
         transforms.CenterCrop(img_dims),
         transforms.PILToTensor()
     ])

@@ -11,6 +11,20 @@ import sys
 reload(sys.modules['task3.utils.utils'])
 from task3.utils.utils import get_ith_element_from_dict_of_tensors
 
+
+def plot_histogram(img):
+    if not isinstance(img, np.ndarray):
+        img = np.array(img)
+
+    if img.dtype is bool:
+        img = img.astype(np.uint8)
+
+    plt.hist(img.ravel(), bins=50, density=True)
+    plt.xlabel("pixel values")
+    plt.ylabel("relative frequency")
+    plt.title("distribution of pixels")
+    plt.show()
+
 def asp_ratio(img):
     """
     Returns the aspect ratio of a one channel image: height/width
@@ -42,6 +56,7 @@ def pad_to_dimensions(img, height=112, width=112):
     padded = np.pad(img, ((0, y_padding), (0, x_padding)), mode='constant')
     return padded
 
+
 def unpad_to_dimensions(img, orig_dims=(112, 112)):
     """
     Removes padding from right and bottom of image (inverse of pad_to_dimensions).
@@ -53,13 +68,6 @@ def unpad_to_dimensions(img, orig_dims=(112, 112)):
     """
 
     return img[:orig_dims[0], :orig_dims[1]]
-
-
-
-def np_to_opencv(img):
-    """converts a 2D array to a 3 channel opencv grayscale image (make sure image value range is 0-255)"""
-    uint_img = np.array(img, dtype=np.uint8)
-    return cv2.cvtColor(uint_img, cv2.COLOR_GRAY2BGR)
 
 
 def mask_to_ratio(mask, height=3, width=4):
@@ -314,7 +322,7 @@ def show_image_list(list_images, list_titles=None, list_cmaps=None, grid=True, n
     _ = plt.show()
 
 
-def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=False):
+def show_img_batch(batch, list_titles=None, pred=None):
     if type(batch) is not dict:
         logger.warning('Could not visualize batch: No batch dict provided.')
         return
@@ -332,35 +340,42 @@ def show_img_batch(batch, list_titles=None, pred=None, include_upscaled_labels=F
     to_plot = []
     n_cols = 4
 
-    if len(batch_frames.shape) == 4:
-        # batch of more than 1 element
-        for i in range(batch_frames.shape[0]):
-            frame = batch_frames[i, 0, :, :].numpy()
-            to_plot.append(frame)
-            if batch_labels is not None:
-                n_cols = 3
-                current_label = batch_labels[i, 0, :, :].numpy()
-                to_plot.append(current_label)
-                to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
-                if include_upscaled_labels:
-                    n_cols = 4
-                    box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
-                    orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
-                    print(orig_frame_dims)
-                    upscaled_label = segment_crop_to_full_image(box_props, current_label, np.zeros(box_props['mask_dims'], dtype=bool), orig_frame_dims=orig_frame_dims)
-                    if batch_frames_orig is not None:
-                        frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
-                        to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
-                    else:
-                        to_plot.append(upscaled_label)
-
-    elif batch_frames.shape == 3:  # batch size 1 # TODO: Handle this better --> same info content as above.
-        to_plot = [batch_frames[0, :, :].numpy()]
+    if batch_frames.shape == 3:  # if batch size is 1
+        batch_frames = [batch_frames[0, :, :].numpy()]
         if batch_labels is not None:
-            to_plot.append(batch_labels[0, :, :].numpy())
-    else:
-        logger.warning('Could not visualize batch: Invalid batch dimensions.')
-        return
+            batch_labels = [batch_labels[0, :, :].numpy()]
+        if batch_frames_orig is not None:
+            batch_frames_orig = [batch_frames_orig[0, :, :].numpy()]
+
+    # batch of more than 1 element
+    for i in range(batch_frames.shape[0]):
+        frame = batch_frames[i, 0, :, :].numpy()
+        plot_histogram(frame)
+        to_plot.append(frame)
+
+        n_cols = 4
+        box_props = get_ith_element_from_dict_of_tensors(i, dictionary=batch_box_props)
+        orig_frame_dims = (batch_orig_frame_dims_h[i].item(), batch_orig_frame_dims_w[i].item())
+        logger.debug('original frame dims {}', orig_frame_dims)
+
+        if batch_labels is not None:
+            n_cols = 3
+            current_label = batch_labels[i, 0, :, :].numpy()
+            to_plot.append(current_label)
+            to_plot.append(overlay_bw_img(current_label, frame, alpha=0.8))
+
+        if batch_frames_orig is not None:
+            n_cols = 4
+            frame_orig = unpad_to_dimensions(batch_frames_orig[i, 0, :, :].numpy(), orig_dims=orig_frame_dims)
+
+            if batch_labels is not None:
+                upscaled_label = segment_crop_to_full_image(box_props, current_label,
+                                                            np.zeros(box_props['mask_dims'], dtype=bool),
+                                                            orig_frame_dims=orig_frame_dims)
+                to_plot.append(overlay_bw_img(upscaled_label, frame_orig, alpha=0.8))
+
+            else:
+                to_plot.append(frame_orig)
 
     figsize = (n_cols * 4.2, math.ceil(len(to_plot) / n_cols) * 4)
 

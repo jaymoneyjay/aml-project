@@ -22,7 +22,7 @@ data:
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
   test_split: 0.1
-  batch_size: 3 # training only
+  batch_size: 1 # training only
 
 model:
   # currently only one model is supported
@@ -71,19 +71,19 @@ training: # only batch sized used, so far
   #lr: 0.0001
   loss: bce # use BCE() or jaccard loss (as this is a direct proxy to IoU); choose between BCEWithLogits(), BCE(). JaccardLoss(), DiceLoss()
   metric: pytorch_iou # TODO add evaluation method from project page
-  epochs: 600
+  epochs: 100
   num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
-  save_path: runs/mv_training_14 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
-run_notes: 'resnet34, unet++ with increased transformation params, batchsize 3, test split 0.1, with attention'
+  save_path: runs/mv_training_15 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
+run_notes: 'unet++ with resnet34 and amateur net, testsplit 0.1, image transformations higher values'
 
 transforms:
   elastic_transform__alpha: 2
   elastic_transform__sigma: 0.08
   elastic_transform__alpha_affine: 0.08
   elastic_transform__p: 0.8
-  random_affine__translate: [0.5, 0.5]
-  random_affine__scale: [1, 1.2]
-  random_perspective__distortion_scale: 0.4
+  random_affine__translate: [0.1, 0.1] # don't change, will error out in training
+  random_affine__scale: 1.2
+  random_perspective__distortion_scale: 0.3
   color_jitter__brightness: 0.3
   color_jitter__contrast: 0.3
   color_jitter__saturation: 0.3

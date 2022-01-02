@@ -7,6 +7,8 @@ from torch.utils.data.dataloader import default_collate
 
 from loguru import logger
 
+import random
+
 from importlib import reload
 import sys
 reload(sys.modules['task3.utils.img_utils'])
@@ -45,6 +47,8 @@ class Dataset(torch.utils.data.Dataset):
         # read data config
         self.dataset_folder = data_cfg.get('path', 'data')
         self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_path', 'train.pkl'))
+        self.dataset_amateur_training_path = "{}/{}".format(self.dataset_folder,
+                                                    data_cfg.get('dataset_amateur_training_path', 'amateur_train.pkl'))
         self.dataset_submission_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_submission_path', 'test.pkl'))
         self.dataset_path = self.dataset_submission_path if self.is_submission else self.dataset_training_path
         self.val_split = data_cfg['validation_split']
@@ -73,25 +77,30 @@ class Dataset(torch.utils.data.Dataset):
 
         # unzip and load dataset
         samples = load_zipped_pickle(self.dataset_path)
+
         logger.debug(samples[0].keys())
 
         if not self.is_submission:
             # Only use selected dataset
+            samples += load_zipped_pickle(self.dataset_amateur_training_path)  # TODO: only load amateur path if needed
+
             if self.dataset is not None:
                 samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
 
             dataset_size = len(samples)
+            random.seed(42)
+            sample_idx = random.sample(range(dataset_size), dataset_size)
             test_size = int(np.floor(self.test_split * dataset_size))
             train_size = int(np.floor((1 - self.val_split) * (dataset_size - test_size)))
 
-            train_samples, test_samples, val_samples = samples[:train_size], samples[train_size:(train_size + test_size)], samples[(train_size + test_size):]
+            train_sample_idx, test_sample_idx, val_sample_idx = sample_idx[:train_size], sample_idx[train_size:(train_size + test_size)], sample_idx[(train_size + test_size):]
 
             if self.mode == 'train':
-                samples = train_samples
+                samples = [samples[i] for i in train_sample_idx]
             elif self.mode == 'val':
-                samples = val_samples
+                samples = [samples[i] for i in val_sample_idx]
             elif self.is_test:
-                samples = test_samples
+                samples = [samples[i] for i in test_sample_idx]
 
         """
             # remove unwanted samples --> not efficient but allows for warnings

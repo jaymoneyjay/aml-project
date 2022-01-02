@@ -195,7 +195,8 @@ class Dataset(torch.utils.data.Dataset):
                 'id': item['id'],
                 'name': name,
                 'frame_cropped': resized_frame,
-                'orig_frame_dims': item['orig_frame_dims']
+                'orig_frame_dims': item['orig_frame_dims'],
+                'box_mask_props': new_mask_box_props,
             }
 
         """
@@ -212,7 +213,6 @@ class Dataset(torch.utils.data.Dataset):
 
         if not self.is_submission:
             item_out['dataset'] = item['dataset']
-            item_out['box_mask_props'] = new_mask_box_props
 
             if resized_label is not None:
                 item_out['label_cropped'] = resized_label

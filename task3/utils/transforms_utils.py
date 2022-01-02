@@ -26,7 +26,7 @@ def tensor_to_float(tensor):
 
 
 # Function to distort image
-def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
+def elastic_transform(image, alpha, sigma, alpha_affine, seed=None):
     """Elastic deformation of images as described in [Simard2003]_ (with modifications).
     .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
          Convolutional Neural Networks applied to Visual Document Analysis", in
@@ -35,8 +35,7 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
 
      Based on https://gist.github.com/erniejunior/601cdf56d2b424757de5
     """
-    if random_state is None:
-        random_state = np.random.RandomState(None)
+    random_state = np.random.RandomState(seed)
 
     if len(image.shape) == 2:
         image = np.expand_dims(image, axis=2)
@@ -79,14 +78,14 @@ def functional_transforms(image, cfg=None, mask=None):
         return None
 
     # Random elastic transform
-    elastic = False # random.random() < cfg['elastic_transform__p']
-    seed = int(round(10000 * random.random()))
+    elastic = random.random() < cfg['elastic_transform__p']
+    seed = np.random.randint(low=0, high=2**32 - 1)
     lambda_elastic = partial(
         elastic_transform,
         alpha=cfg['elastic_transform__alpha'],
         sigma=cfg['elastic_transform__sigma'],
         alpha_affine=cfg['elastic_transform__alpha_affine'],
-        random_state=np.random.RandomState(seed)
+        seed=seed,
     )
     if elastic:
         image = lambda_elastic(image)
@@ -94,17 +93,17 @@ def functional_transforms(image, cfg=None, mask=None):
     image = tf.to_pil_image(image)
 
     # Random horizontal flipping
-    hflip = random.random() > 0.5
+    hflip = False # random.random() > 0.5
     if hflip:
         image = tf.hflip(image)
 
     # Random vertical flipping
-    vflip = random.random() > 0.5
+    vflip = False  # random.random() > 0.5
     if vflip:
         image = tf.vflip(image)
 
-    affine =  random.random() > 0.5
-    lambda_affine = partial(tf.affine, angle=random.randrange(-15, 15), translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale'], shear=[random.randrange(-30, 30), random.randrange(-30, 30)], interpolation=InterpolationMode.NEAREST)
+    affine = random.random() > 0.5
+    lambda_affine = partial(tf.affine, angle=random.randrange(-15, 15), translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale'], shear=[random.randrange(-15, 15), random.randrange(-15, 15)], interpolation=InterpolationMode.NEAREST)
     if affine:
         image = lambda_affine(img=image)
 

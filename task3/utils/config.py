@@ -63,7 +63,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     dataset = Dataset(
         data_cfg=data_cfg,
         mode=mode,
-        img_transforms=img_transforms
+        img_transforms=img_transforms,
     )
 
     batch_size = 1

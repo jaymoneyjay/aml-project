@@ -22,7 +22,7 @@ import task3.utils.dataset
 reload(sys.modules['task3.utils.dataset'])
 from task3.utils.dataset import Dataset
 reload(sys.modules['task3.utils.transforms_utils'])
-from task3.utils.transforms_utils import elastic_transform, cv2_to_np, functional_transforms
+from task3.utils.transforms_utils import elastic_transform, cv2_to_np, functional_transforms, to_scaled_tensor
 
 def init(config='configs/default.yaml'):
     # fix random seeds
@@ -56,16 +56,6 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     assert mode in ['train', 'submission']
     data_cfg = cfg['data']
 
-    img_transforms = partial(functional_transforms, cfg=cfg.get('transforms', None))
-    if mode == 'submission':
-        img_transforms = to_scaled_tensor
-        
-    dataset = Dataset(
-        data_cfg=data_cfg,
-        mode=mode,
-        img_transforms=img_transforms,
-    )
-
     batch_size = 1
     if mode in ['train']:
         batch_size = data_cfg.get('batch_size', 8)
@@ -75,59 +65,68 @@ def get_data_loader(cfg, mode='train', get_subset=False):
     num_workers = cfg['training'].get('num_workers', 0)
 
     subset = None
+    """
     if get_subset:
         # get subset of data for quick training
         subset_idx = range(0, len(dataset), cfg['training'].get('take_every', 20))
         subset = Subset(dataset, subset_idx)
+    """
 
     # split train and validation set according to https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
     if mode != 'submission':
-        test_split = data_cfg.get('test_split', 0.2)
-        validation_split = data_cfg.get('validation_split', 0.2)
+        img_transforms = partial(functional_transforms, cfg=cfg.get('transforms', None))
 
-        # Creating data indices for training and validation splits:
-        dataset_size = len(dataset)
-        indices = list(range(dataset_size))
-        split = int(np.floor(validation_split * dataset_size))
-        test_size = int(np.floor(test_split * dataset_size))
-        train_size = int(np.floor((1 - validation_split) * (dataset_size - test_size)))
-        if shuffle:
-            np.random.shuffle(indices)
-        train_indices, test_indices, val_indices = indices[:train_size], indices[
-                                                                         train_size:(train_size + test_size)], indices[(
-                                                                            train_size + test_size):]
-        train_indices, val_indices = indices[split:], indices[:split]
-
-        # Creating PT data samplers and loaders:
         logger.debug('Dataset creation: train')
-        train_sampler = SubsetRandomSampler(train_indices)
-        train_loader = DataLoader(subset if get_subset else dataset, 
+        train_dataset = Dataset(
+            data_cfg=data_cfg,
+            mode='train',
+            img_transforms=img_transforms,
+        )
+        train_loader = DataLoader(subset if get_subset else train_dataset,
                                   batch_size=batch_size,
                                   num_workers=num_workers,
-                                  sampler=train_sampler,
-                                  drop_last=True
+                                  drop_last=True,
+                                  shuffle=True,
                                   )
 
         logger.debug('Dataset creation: validation')
-        valid_sampler = SubsetRandomSampler(val_indices)
-        validation_loader = DataLoader(subset if get_subset else dataset, 
-                                       batch_size=batch_size,
-                                       num_workers=num_workers,
-                                       sampler=valid_sampler,
-                                       drop_last=True
-                                      )
+        val_dataset = Dataset(
+            data_cfg=data_cfg,
+            mode='val',
+            img_transforms=img_transforms,
+        )
+        validation_loader = DataLoader(subset if get_subset else val_dataset,
+                                  batch_size=batch_size,
+                                  num_workers=num_workers,
+                                  drop_last=True,
+                                  shuffle=True,
+                                  )
 
-        logger.debug('Dataset creation: test')
-        test_sampler = SubsetRandomSampler(test_indices)
-        test_loader = DataLoader(subset if get_subset else dataset,
-                                       batch_size=batch_size,
-                                       num_workers=num_workers,
-                                       sampler=test_sampler
-                                       ) if test_size > 0 else None
+        test_loader = None
+        if data_cfg['test_split'] > 0:
+            logger.debug('Dataset creation: test')
+            test_dataset = Dataset(
+                data_cfg=data_cfg,
+                mode='test',
+                img_transforms=to_scaled_tensor,
+            )
+            test_loader = DataLoader(subset if get_subset else test_dataset,
+                                      batch_size=batch_size,
+                                      num_workers=num_workers,
+                                      drop_last=True,
+                                      shuffle=True,
+                                      )
         
         return train_loader, validation_loader, test_loader
     
-    else: # no sampling needed for test set
+    else:  # no sampling needed for test set
+        logger.debug('Dataset creation: submission')
+        dataset = Dataset(
+            data_cfg=data_cfg,
+            mode=mode,
+            img_transforms=to_scaled_tensor,
+        )
+
         data_loader = DataLoader(
                subset if get_subset else dataset,
                batch_size=batch_size,
@@ -203,11 +202,6 @@ def get_loss(model, cfg):
     logger.info(f'Using {criterion} as loss function.')
 
     return criterion
-
-
-def to_scaled_tensor(image, mask=None):
-    return transforms.ToTensor()(image), None
-
 
 def get_lrscheduler(optimizer, cfg):
     

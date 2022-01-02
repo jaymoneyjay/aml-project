@@ -24,6 +24,9 @@ class Dataset(torch.utils.data.Dataset):
         """
         if data_cfg is None:
             data_cfg = {}
+
+        assert mode in ['train', 'val', 'test', 'submission']
+        self.is_test = (mode == 'test')
         self.is_submission = (mode == 'submission')
 
         transformations = None
@@ -32,7 +35,8 @@ class Dataset(torch.utils.data.Dataset):
 
         incl_samples = data_cfg.get('include_samples', None)
         excl_samples = data_cfg.get('exclude_samples', None)
-        if mode in ['train']:  # TODO: train/val splitting if necessary
+
+        if not self.is_submission:  # TODO: train/val splitting if necessary
             if incl_samples is not None:
                 incl_samples = incl_samples.split(',')
             if excl_samples is not None:
@@ -43,8 +47,12 @@ class Dataset(torch.utils.data.Dataset):
         self.dataset_training_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_training_path', 'train.pkl'))
         self.dataset_submission_path = "{}/{}".format(self.dataset_folder, data_cfg.get('dataset_submission_path', 'test.pkl'))
         self.dataset_path = self.dataset_submission_path if self.is_submission else self.dataset_training_path
-        self.exclude_samples = excl_samples
-        self.include_samples = incl_samples
+        self.val_split = data_cfg['validation_split']
+        self.test_split = data_cfg['test_split']
+        # self.exclude_samples = excl_samples # TODO: Make this work with new DL implementation
+        # self.include_samples = incl_samples
+        self.exclude_samples = None
+        self.include_samples = None
         self.mode = mode
         self.orig_in_dl = data_cfg.get('orig_in_dl', False)
         self.dataset = data_cfg.get('dataset', None)
@@ -65,12 +73,27 @@ class Dataset(torch.utils.data.Dataset):
 
         # unzip and load dataset
         samples = load_zipped_pickle(self.dataset_path)
-        print(samples[0].keys())
+        logger.debug(samples[0].keys())
+
         if not self.is_submission:
             # Only use selected dataset
             if self.dataset is not None:
                 samples = list(filter(lambda d: d['dataset'] == self.dataset, samples))
 
+            dataset_size = len(samples)
+            test_size = int(np.floor(self.test_split * dataset_size))
+            train_size = int(np.floor((1 - self.val_split) * (dataset_size - test_size)))
+
+            train_samples, test_samples, val_samples = samples[:train_size], samples[train_size:(train_size + test_size)], samples[(train_size + test_size):]
+
+            if self.mode == 'train':
+                samples = train_samples
+            elif self.mode == 'val':
+                samples = val_samples
+            elif self.is_test:
+                samples = test_samples
+
+        """
             # remove unwanted samples --> not efficient but allows for warnings
             if self.exclude_samples:
                 for name in self.exclude_samples:
@@ -90,6 +113,7 @@ class Dataset(torch.utils.data.Dataset):
                     except:
                         logger.warning('Sample name "{}" not found in configured dataset.', name)
                 samples = samples_temp
+        """
 
         sample_names = []
         for sample in samples:
@@ -109,8 +133,6 @@ class Dataset(torch.utils.data.Dataset):
                 is_expert = dataset == 'expert' or self.dataset is None
                 frame = video[:, :, i].astype(np.uint8)
                 label = sample['label'][:, :, i] if not self.is_submission and i in sample['frames'] else None
-                box = None
-                orig_frame_dims = frame.shape
 
                 box = sample.get('box', sample.get('roi', None))
                 if is_expert:

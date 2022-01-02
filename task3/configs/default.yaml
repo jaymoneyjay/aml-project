@@ -11,7 +11,7 @@ data:
   dataset: expert # possible values: amateur, expert, null (null includes both datasets; training only)
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
-  test_split: 0 # some guidance on choosing optimal splits: https://stackoverflow.com/a/13623707/3142478; size of training (incl. validation) set is 1-test_split
+  test_split: 0.25 # some guidance on choosing optimal splits: https://stackoverflow.com/a/13623707/3142478; size of training (incl. validation) set is 1-test_split
   validation_split: 0.2 # size of validation set (calculated after splitting the training set into test and train sets)
 
   batch_size: 8 # training only

@@ -10,6 +10,7 @@ from functools import partial
 from torchvision.transforms import InterpolationMode
 from torchvision import transforms
 import torchvision.transforms.functional as tf
+from task3.utils.img_utils import adaptive_histogram_equalization
 
 
 def cv2_to_np(img):
@@ -81,6 +82,9 @@ def functional_transforms(image, cfg=None, mask=None):
     if cfg is None:
         logger.warning('No transformation settings provided; no transformations will be applied')
         return None
+
+    if random.random() > 0.5:
+        image = adaptive_histogram_equalization(image, clip_limit=1.5, tile_grid_size=(5, 5))
 
     # Random elastic transform
     elastic = random.random() < cfg['elastic_transform__p']

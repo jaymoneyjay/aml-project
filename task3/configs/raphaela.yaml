@@ -21,21 +21,21 @@ data:
   only_annotated: True # If true, dataloader only loads frames with labels (training only)
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
-  test_split: 0
-  batch_size: 1 # training only
+  test_split: 0.1
+  batch_size: 3 # training only
 
 model:
   # currently only one model is supported
-  name: smp-unet-deepv3+ #deepv3+ needs drop_last=True in datalaoder in config.py
+  name: smp-unet-plusplus #deepv3+ needs drop_last=True in datalaoder in config.py
   params:
-    encoder_name: resnet101
+    encoder_name: resnet34
     encoder_weights: null
     in_channels: 1
     classes: 1 # we only need one output channel showing True/False
     encoder_depth: 5
-    #decoder_use_batchnorm: True
-    #decoder_channels: [256, 128, 64, 32, 16]
-    #decoder_attention_type: scse #scse: boosting meaningful features while suppressing weak ones.
+    decoder_use_batchnorm: True
+    decoder_channels: [256, 128, 64, 32, 16]
+    decoder_attention_type: scse #scse: boosting meaningful features while suppressing weak ones.
     activation: sigmoid
     aux_params: null
   #name: smp-unet-plusplus # Decoder of Unet++ is more complex than in usual Unet.
@@ -63,7 +63,7 @@ model:
   #aux_params: null 
 training: # only batch sized used, so far
   optimizer: Adam
-  lr: 0.0005 # was set to 0.00005 before
+  lr: 0.005 # was set to 0.00005 before
   momentum: 0.9
 #https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.StepLR.html and #https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html
   lr_scheduler: steplr #schedule lr, use steplr or reduceonplateau 
@@ -71,19 +71,19 @@ training: # only batch sized used, so far
   #lr: 0.0001
   loss: bce # use BCE() or jaccard loss (as this is a direct proxy to IoU); choose between BCEWithLogits(), BCE(). JaccardLoss(), DiceLoss()
   metric: pytorch_iou # TODO add evaluation method from project page
-  epochs: 100
+  epochs: 600
   num_workers: 8  # default is 0: running on main process, hogasrv007 has 8 cores and 8 threads / core -> +1 might be enough speed up
-  save_path: runs/mv_training_9 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
-run_notes: 'deeplabv3+ resnet101, run _8 was w/ resnet 34! w/ attention, batch size 1, 100 epochs'
+  save_path: runs/mv_training_14 # (no trailing slash); where to save models to and store training/validation metrics (scalars)
+run_notes: 'resnet34, unet++ with increased transformation params, batchsize 3, test split 0.1, with attention'
 
 transforms:
-  elastic_transform__alpha: 1.5
+  elastic_transform__alpha: 2
   elastic_transform__sigma: 0.08
   elastic_transform__alpha_affine: 0.08
   elastic_transform__p: 0.8
-  random_affine__translate: [0.1, 0.1]
+  random_affine__translate: [0.5, 0.5]
   random_affine__scale: [1, 1.2]
-  random_perspective__distortion_scale: 0.1
-  color_jitter__brightness: 0.1
-  color_jitter__contrast: 0.1
-  color_jitter__saturation: 0.1
+  random_perspective__distortion_scale: 0.4
+  color_jitter__brightness: 0.3
+  color_jitter__contrast: 0.3
+  color_jitter__saturation: 0.3

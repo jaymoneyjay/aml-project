@@ -1,0 +1,13 @@
+For the mitral valve segmentation we used the following techniques:
+
+ROI Prediction: Heatmap as prior for spectral norm. Our predictions are quite good here.
+
+For data augmentation, we use the following techniques, applied randomly: Flipping, elastic transforms, adaptive histogram equalization, affine transforms.
+
+Model: Google's DeepLlbv3+ architecture gave us a critical advantage
+
+Challenges: Our team spent the most time debugging seemingly minor issues. The biggest step forward happened when we discovered a bug in the function we used to upscale the predicted labels to the original formats for submission. Including data augmentation as described above gave us another good bump in the score.
+
+Further improvements: With additional time, our next steps would have been to implement a way to interpolate between the available frame labels. eg with optical flow or using blob detection.
+
+My contributions: I was responsible for data preprocessing and data loading and the creation of the code framework.

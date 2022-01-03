@@ -32,6 +32,7 @@ class Dataset(torch.utils.data.Dataset):
         self.mode = mode
 
         # read data config
+        self.device = device
         self.dataset_folder = 'data'
         self.dataset_path = "{}/{}".format(self.dataset_folder, 'transformed_data.pkl')
         self.samples = []
@@ -50,7 +51,7 @@ class Dataset(torch.utils.data.Dataset):
             if label is not None:
                 sample['label_cropped'] = sample['label_cropped'][0, :, :, :]
             corrected_samples.append(sample)
-            if self.mode == 'train' and i > 750:
+            if self.mode == 'train' and i > 200:
                 break
         return corrected_samples
 

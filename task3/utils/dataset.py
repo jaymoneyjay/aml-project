@@ -17,7 +17,7 @@ from task3.utils.img_utils import *
 class Dataset(torch.utils.data.Dataset):
     """ Dataset class"""
 
-    def __init__(self, data_cfg=None, mode='train', img_transforms=None):
+    def __init__(self, data_cfg=None, mode='train', img_transforms=None, device='cpu'):
         """ Initialization of the the dataset.
 
         Args:
@@ -30,6 +30,7 @@ class Dataset(torch.utils.data.Dataset):
         assert mode in ['train', 'val', 'test', 'submission']
         self.is_test = (mode == 'test')
         self.is_submission = (mode == 'submission')
+        self.device = device
 
         transformations = None
         if data_cfg.get('transforms', True):
@@ -148,17 +149,39 @@ class Dataset(torch.utils.data.Dataset):
                     box = pad_to_dimensions(box, height=PAD_HEIGHT, width=PAD_WIDTH)
 
                 if not self.only_annotated or label is not None or self.is_submission:
-                    data.append({
-                        'id': '{}_{}'.format(sample['name'], i),
-                        'name': sample['name'],  # keep name as it is needed in evaluation function
-                        'frame': frame if not is_expert else pad_to_dimensions(frame, height=PAD_HEIGHT, width=PAD_WIDTH),
-                        'box':  box,
-                        'dataset': dataset,
-                        'label': label if (not is_expert or label is None) else pad_to_dimensions(label, height=PAD_HEIGHT, width=PAD_WIDTH), # bool
-                        'orig_frame_dims': frame.shape,
-                        'mean': sample_mean,
-                        'std': sample_std,
-                    })
+                    if not self.is_submission:
+                        for j in range(6):
+                             data.append({
+                                 'id': '{}_{}'.format(sample['name'], i),
+                                 'name': sample['name'],  # keep name as it is needed in evaluation function
+                                 'frame': frame if not is_expert else pad_to_dimensions(frame, height=PAD_HEIGHT,
+                                                                                        width=PAD_WIDTH),
+                                 'box': box,
+                                 'dataset': dataset,
+                                 'label': label if (not is_expert or label is None) else pad_to_dimensions(label,
+                                                                                                           height=PAD_HEIGHT,
+                                                                                                           width=PAD_WIDTH),
+                                 # bool
+                                 'orig_frame_dims': frame.shape,
+                                 'mean': sample_mean,
+                                 'std': sample_std,
+                             })
+                    else:
+                        data.append({
+                            'id': '{}_{}'.format(sample['name'], i),
+                            'name': sample['name'],  # keep name as it is needed in evaluation function
+                            'frame': frame if not is_expert else pad_to_dimensions(frame, height=PAD_HEIGHT,
+                                                                                   width=PAD_WIDTH),
+                            'box': box,
+                            'dataset': dataset,
+                            'label': label if (not is_expert or label is None) else pad_to_dimensions(label,
+                                                                                                      height=PAD_HEIGHT,
+                                                                                                      width=PAD_WIDTH),
+                            # bool
+                            'orig_frame_dims': frame.shape,
+                            'mean': sample_mean,
+                            'std': sample_std,
+                        })
 
         return data
 
@@ -196,7 +219,7 @@ class Dataset(torch.utils.data.Dataset):
         # Transformsations
         if self.transforms is not None:
             # apply the transformations to both image and its mask
-            resized_frame, resized_label = self.transforms(resized_frame, mask=resized_label)
+            resized_frame, resized_label = self.transforms(resized_frame, mask=resized_label, device=self.device)
             if resized_label is not None:
                 assert resized_label.dtype == torch.bool
 

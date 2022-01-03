@@ -20,7 +20,9 @@ from task3.utils.logger import logger_init
 
 import task3.utils.dataset
 reload(sys.modules['task3.utils.dataset'])
-from task3.utils.simple_dataset import Dataset
+from task3.utils.dataset import Dataset
+reload(sys.modules['task3.utils.transforms_utils'])
+from task3.utils.transforms_utils import elastic_transform, cv2_to_np, functional_transforms, to_scaled_tensor
 
 def init(config='configs/default.yaml'):
     # fix random seeds
@@ -62,17 +64,26 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         batch_size = data_cfg.get('batch_size', 8)
 
     # Set up data loader
+    shuffle = (mode == 'train') # in testing shuffling is never used # TODO: set to previous value for submission (only mode == 'train')
     num_workers = cfg['training'].get('num_workers', 0)
 
     subset = None
+    """
+    if get_subset:
+        # get subset of data for quick training
+        subset_idx = range(0, len(dataset), cfg['training'].get('take_every', 20))
+        subset = Subset(dataset, subset_idx)
+    """
 
     # split train and validation set according to https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
     if mode != 'submission':
+        img_transforms = partial(functional_transforms, cfg=cfg.get('transforms', None))
 
         logger.debug('Dataset creation: train')
         train_dataset = Dataset(
             data_cfg=data_cfg,
             mode='train',
+            img_transforms=img_transforms,
             device=device,
         )
         train_loader = DataLoader(subset if get_subset else train_dataset,
@@ -86,6 +97,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         val_dataset = Dataset(
             data_cfg=data_cfg,
             mode='val',
+            img_transforms=img_transforms,
             device=device,
         )
         validation_loader = DataLoader(subset if get_subset else val_dataset,
@@ -101,6 +113,7 @@ def get_data_loader(cfg, mode='train', get_subset=False):
             test_dataset = Dataset(
                 data_cfg=data_cfg,
                 mode='test',
+                img_transforms=to_scaled_tensor,
                 device=device,
             )
             test_loader = DataLoader(subset if get_subset else test_dataset,
@@ -115,7 +128,8 @@ def get_data_loader(cfg, mode='train', get_subset=False):
         logger.debug('Dataset creation: submission')
         dataset = Dataset(
             data_cfg=data_cfg,
-            mode='submission',
+            mode=mode,
+            img_transforms=to_scaled_tensor,
             device=device,
         )
 
@@ -125,6 +139,8 @@ def get_data_loader(cfg, mode='train', get_subset=False):
                num_workers=num_workers,
                shuffle=False,
            )
+
+        dataset.data
 
         return data_loader
 
@@ -221,3 +237,35 @@ def get_trainer(model, vis_dir, cfg, optimizer=None):
     else:
         raise Exception('Not supported.')
     return None
+
+
+def get_transforms(cfg):
+    if cfg is None:
+        logger.warning('No transformation settings provided; no transformations will be applied')
+        return None
+
+    lambda_elastic = partial(
+        elastic_transform,
+        alpha=cfg['elastic_transform__alpha'],
+        sigma=cfg['elastic_transform__sigma'],
+        alpha_affine=cfg['elastic_transform__alpha_affine']
+    )
+
+    transform_elastic = transforms.Compose([
+        transforms.Lambda(lambda_elastic),
+        transforms.Lambda(cv2_to_np)
+    ])
+
+    da_transforms = transforms.Compose([
+        transforms.RandomApply([transform_elastic], p=cfg['elastic_transform__p']),
+        transforms.ToPILImage(),
+        transforms.RandomAffine(30, translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale']),
+        transforms.RandomPerspective(distortion_scale=cfg['random_perspective__distortion_scale']),
+        transforms.ColorJitter(
+            brightness=cfg['color_jitter__brightness'],
+            contrast=cfg['color_jitter__contrast'],
+            saturation=cfg['color_jitter__saturation']
+        ),
+        transforms.ToTensor(),  # TODO: Include normalization to scale [0, 1]
+    ])
+    return da_transforms

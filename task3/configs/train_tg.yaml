@@ -1,7 +1,7 @@
 application:
   log_level: 'DEBUG' # one of ['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL']
 
-device: cpu # cpu or cuda (for gpu); train on cpu or gpu
+device: cuda # cpu or cuda (for gpu); train on cpu or gpu
 
 data:
   path: data/data_roi # data folder path (no trailing slash)
@@ -22,7 +22,7 @@ data:
   transformations: True # applies composition of transforms (toPIL, )
   validation_split: 0.2 # size of validation set, size of training set is 1-val_size
   test_split: 0
-  batch_size: 8 # training only
+  batch_size: 1 # training only
 
 model:
   # currently only one model is supported

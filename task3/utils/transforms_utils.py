@@ -26,9 +26,9 @@ def np_to_opencv(img):
 def tensor_to_float(tensor):
     return tensor.float()
 
-def to_scaled_tensor(image, mask=None):
+def to_scaled_tensor(image, mask=None, device='cpu'):
     if mask is None:
-        return transforms.ToTensor()(image), None
+        return transforms.ToTensor()(adaptive_histogram_equalization(image, clip_limit=1.25, tile_grid_size=(3, 3))), None
     return transforms.ToTensor()(image), transforms.ToTensor()(mask).bool()
 
 # Function to distort image
@@ -78,12 +78,13 @@ def elastic_transform(image, alpha, sigma, alpha_affine, seed=None):
     return img_transformed[:, :, 0]
 
 
-def functional_transforms(image, cfg=None, mask=None):
+def functional_transforms(image, cfg=None, mask=None, device='cpu'):
     if cfg is None:
         logger.warning('No transformation settings provided; no transformations will be applied')
         return None
 
-    if random.random() > 0.5:
+    hist = random.random() > 0.5
+    if hist:
         image = adaptive_histogram_equalization(image, clip_limit=1.5, tile_grid_size=(5, 5))
 
     # Random elastic transform
@@ -115,7 +116,6 @@ def functional_transforms(image, cfg=None, mask=None):
     lambda_affine = partial(tf.affine, angle=random.randrange(-15, 15), translate=cfg['random_affine__translate'], scale=cfg['random_affine__scale'], shear=[random.randrange(-15, 15), random.randrange(-15, 15)], interpolation=InterpolationMode.NEAREST)
     if affine:
         image = lambda_affine(img=image)
-
     """
     perspective = random() > 0.5
     if perspective:
